@@ -31,8 +31,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.source
 import okio.use
 import org.jetbrains.annotations.Blocking
 import org.koitharu.kotatsu.core.LocalizedAppContext
@@ -47,6 +49,7 @@ import org.koitharu.kotatsu.core.ui.image.TrimTransformation
 import org.koitharu.kotatsu.core.util.FileSize
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.URI_SCHEME_ZIP
+import org.koitharu.kotatsu.core.util.ext.MimeType
 import org.koitharu.kotatsu.core.util.ext.cancelChildrenAndJoin
 import org.koitharu.kotatsu.core.util.ext.compressToPNG
 import org.koitharu.kotatsu.core.util.ext.ensureRamAtLeast
@@ -58,6 +61,7 @@ import org.koitharu.kotatsu.core.util.ext.isPowerSaveMode
 import org.koitharu.kotatsu.core.util.ext.isZipUri
 import org.koitharu.kotatsu.core.util.ext.lifecycleScope
 import org.koitharu.kotatsu.core.util.ext.mangaSourceExtra
+import org.koitharu.kotatsu.core.util.ext.isImage
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.ramAvailable
 import org.koitharu.kotatsu.core.util.ext.toMimeType
@@ -298,10 +302,22 @@ class PageLoader @Inject constructor(
 				if (isPrefetch) {
 					downloadSlowdownDispatcher.delay(page.source)
 				}
+				val inkStoryXorKey = extractInkStoryXorKey(pageUrl, page.source)
 				val request = createPageRequest(pageUrl, page.source)
 				imageProxyInterceptor.interceptPageRequest(request, okHttp).ensureSuccess().use { response ->
 					response.requireBody().withProgress(progress).use {
-						cache.set(pageUrl, it.source(), it.contentType()?.toMimeType())
+						val responseMimeType = it.contentType()?.toMimeType()
+						if (inkStoryXorKey != null) {
+							val decodedBytes = decodeInkStoryXor(it.bytes(), inkStoryXorKey)
+							val decodedMimeType = detectImageMimeType(decodedBytes)
+								?: responseMimeType?.takeIf { mime -> mime.isImage }
+							decodedBytes.inputStream().source().use { decodedSource ->
+								cache.set(pageUrl, decodedSource, decodedMimeType)
+							}
+						} else {
+							val mimeType = responseMimeType?.takeIf { mime -> mime.isImage }
+							cache.set(pageUrl, it.source(), mimeType)
+						}
 					}
 				}.toUri()
 			}
@@ -337,6 +353,8 @@ class PageLoader @Inject constructor(
 		private const val PROGRESS_UNDEFINED = -1f
 		private const val PREFETCH_LIMIT_DEFAULT = 6
 		private const val PREFETCH_MIN_RAM_MB = 80L
+		private const val INK_STORY_FRAGMENT_PREFIX = "ik=xor:"
+		private const val MANGA_OVH_SOURCE = "MANGA_OVH"
 
 		fun createPageRequest(pageUrl: String, mangaSource: MangaSource) = Request.Builder()
 			.url(pageUrl)
@@ -345,6 +363,84 @@ class PageLoader @Inject constructor(
 			.cacheControl(CommonHeaders.CACHE_CONTROL_NO_STORE)
 			.tag(MangaSource::class.java, mangaSource)
 			.build()
+
+		private fun extractInkStoryXorKey(pageUrl: String, mangaSource: MangaSource): ByteArray? {
+			if (mangaSource.name != MANGA_OVH_SOURCE) {
+				return null
+			}
+			val url = pageUrl.toHttpUrlOrNull() ?: return null
+			if (!url.host.endsWith("inuko.me") || !url.encodedPath.contains("/chapters/")) {
+				return null
+			}
+			val imageName = url.pathSegments.lastOrNull()
+				?.substringBeforeLast('.', "")
+				.orEmpty()
+			if (imageName.length != 36 || imageName.getOrNull(14) != 'x') {
+				return null
+			}
+			val fragment = url.fragment ?: return null
+			if (!fragment.startsWith(INK_STORY_FRAGMENT_PREFIX)) {
+				return null
+			}
+			val key = fragment.removePrefix(INK_STORY_FRAGMENT_PREFIX)
+			return key.takeIf { it.isNotBlank() }?.toByteArray()
+		}
+
+		private fun decodeInkStoryXor(source: ByteArray, key: ByteArray): ByteArray {
+			if (key.isEmpty()) {
+				return source
+			}
+			val result = ByteArray(source.size)
+			for (i in source.indices) {
+				result[i] = (source[i].toInt() xor key[i % key.size].toInt()).toByte()
+			}
+			return result
+		}
+
+		private fun detectImageMimeType(bytes: ByteArray): MimeType? {
+			if (bytes.size >= 12
+				&& bytes[0] == 'R'.code.toByte()
+				&& bytes[1] == 'I'.code.toByte()
+				&& bytes[2] == 'F'.code.toByte()
+				&& bytes[3] == 'F'.code.toByte()
+				&& bytes[8] == 'W'.code.toByte()
+				&& bytes[9] == 'E'.code.toByte()
+				&& bytes[10] == 'B'.code.toByte()
+				&& bytes[11] == 'P'.code.toByte()
+			) {
+				return MimeType("image/webp")
+			}
+			if (bytes.size >= 3
+				&& bytes[0] == 0xff.toByte()
+				&& bytes[1] == 0xd8.toByte()
+				&& bytes[2] == 0xff.toByte()
+			) {
+				return MimeType("image/jpeg")
+			}
+			if (bytes.size >= 8
+				&& bytes[0] == 0x89.toByte()
+				&& bytes[1] == 0x50.toByte()
+				&& bytes[2] == 0x4e.toByte()
+				&& bytes[3] == 0x47.toByte()
+				&& bytes[4] == 0x0d.toByte()
+				&& bytes[5] == 0x0a.toByte()
+				&& bytes[6] == 0x1a.toByte()
+				&& bytes[7] == 0x0a.toByte()
+			) {
+				return MimeType("image/png")
+			}
+			if (bytes.size >= 6
+				&& bytes[0] == 'G'.code.toByte()
+				&& bytes[1] == 'I'.code.toByte()
+				&& bytes[2] == 'F'.code.toByte()
+				&& bytes[3] == '8'.code.toByte()
+				&& (bytes[4] == '7'.code.toByte() || bytes[4] == '9'.code.toByte())
+				&& bytes[5] == 'a'.code.toByte()
+			) {
+				return MimeType("image/gif")
+			}
+			return null
+		}
 
 
 		@Blocking
