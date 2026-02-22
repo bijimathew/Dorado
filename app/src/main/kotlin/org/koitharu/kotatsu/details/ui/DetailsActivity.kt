@@ -149,12 +149,15 @@ class DetailsActivity :
 		infoBinding.textViewSource.setOnClickListener(this)
 		viewBinding.imageViewCover.setOnClickListener(this)
 		viewBinding.textViewTitle.setOnClickListener(this)
+		viewBinding.textViewSubtitle.setOnClickListener(this)
 		viewBinding.buttonDescriptionMore.setOnClickListener(this)
 		viewBinding.buttonScrobblingMore.setOnClickListener(this)
 		viewBinding.buttonRelatedMore.setOnClickListener(this)
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
 		viewBinding.textViewDescription.viewTreeObserver.addOnDrawListener(this)
+		viewBinding.textViewTitle.setTextIsSelectable(false)
+		viewBinding.textViewSubtitle.setTextIsSelectable(false)
 		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
@@ -268,13 +271,15 @@ class DetailsActivity :
 
 			R.id.textView_title -> {
 				val title = viewModel.getMangaOrNull()?.title?.nullIfEmpty() ?: return
-				buildAlertDialog(this) {
-					setMessage(title)
-					setNegativeButton(R.string.close, null)
-					setPositiveButton(androidx.preference.R.string.copy) { _, _ ->
-						copyToClipboard(getString(R.string.content_type_manga), title)
-					}
-				}.show()
+				showTextDialog(title)
+			}
+
+			R.id.textView_subtitle -> {
+				val titles = viewModel.getMangaOrNull()
+					?.altTitles
+					?.joinToString("\n")
+					?.nullIfEmpty() ?: return
+				showTextDialog(titles)
 			}
 		}
 	}
@@ -521,6 +526,16 @@ class DetailsActivity :
 
 	private fun loadCover(imageUrl: String?) {
 		viewBinding.imageViewCover.setImageAsync(imageUrl, viewModel.getMangaOrNull())
+	}
+
+	private fun showTextDialog(text: String) {
+		buildAlertDialog(this) {
+			setMessage(text)
+			setNegativeButton(R.string.close, null)
+			setPositiveButton(androidx.preference.R.string.copy) { _, _ ->
+				copyToClipboard(getString(R.string.content_type_manga), text)
+			}
+		}.show()
 	}
 
 	private fun String.withEstimatedTime(time: ReadingTime?): String {
