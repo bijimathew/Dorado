@@ -1,0 +1,62 @@
+name: Sync Fork Fixes
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply merges"
+        required: true
+        default: true
+        type: boolean
+      push:
+        description: "Push target branch after apply"
+        required: true
+        default: true
+        type: boolean
+      sources:
+        description: "Comma-separated sources: upstream,redo,yumemi"
+        required: false
+        default: "upstream,redo,yumemi"
+        type: string
+  schedule:
+    - cron: "37 4 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync upstream and forks
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/sync-fork-fixes.sh
+
+          args=()
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.apply }}" == "true" ]]; then
+              args+=(--apply)
+            fi
+            if [[ "${{ github.event.inputs.push }}" == "true" ]]; then
+              args+=(--push)
+            fi
+            if [[ -n "${{ github.event.inputs.sources }}" ]]; then
+              args+=(--sources "${{ github.event.inputs.sources }}")
+            fi
+          else
+            args+=(--apply --push)
+          fi
+
+          scripts/sync-fork-fixes.sh "${args[@]}"
