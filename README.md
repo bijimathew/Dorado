@@ -88,11 +88,11 @@ See [CONTRIBUTING.md](https://github.com/glitch-228/Kaisoku/blob/devel/CONTRIBUT
 ### Certificate fingerprints
 
 ```plaintext
-2C:19:C7:E8:07:61:2B:8E:94:51:1B:FD:72:67:07:64:5D:C2:58:AE
+E8:40:7F:62:D5:64:F5:91:12:D0:E9:B1:B4:15:E9:A3:80:D9:67:3A
 ```
 
 ```plaintext
-67:E1:51:00:BB:80:93:01:78:3E:DC:B6:34:8F:A3:BB:F8:30:34:D9:1E:62:86:8A:91:05:3D:BD:70:DB:3F:18
+37:BA:22:C3:90:AD:44:4A:88:9C:75:31:AF:E5:69:AB:56:E7:36:AE:6C:82:7A:ED:36:B7:E9:2B:DB:8A:A1:D7
 ```
 
 ### License

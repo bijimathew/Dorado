@@ -28,8 +28,8 @@ android {
 		applicationId 'io.github.kotatsuredo.kotatsu'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 2008
-		versionName = '9.6.5-1'
+		versionCode = 2009
+		versionName = '9.6.5-2'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -126,11 +126,11 @@ dependencies {
 	def parsersVersion = libs.versions.parsers.get()
 	if (System.properties.containsKey('parsersVersionOverride')) {
 		// usage:
-		// -DparsersVersionOverride=$(curl -s https://api.github.com/repos/kotatsuapp/kotatsu-parsers/commits/master -H "Accept: application/vnd.github.sha" | cut -c -10)
+		// -DparsersVersionOverride=$(curl -s https://api.github.com/repos/glitch-228/kaisoku-parsers/commits/master -H "Accept: application/vnd.github.sha" | cut -c -10)
 		parsersVersion = System.getProperty('parsersVersionOverride')
 	}
 	//noinspection UseTomlInstead
-	implementation("com.github.clquwu:kotatsu-parsers-redo:$parsersVersion") {
+	implementation("com.github.glitch-228:kaisoku-parsers:$parsersVersion") {
 		exclude group: 'org.json', module: 'json'
 	}
 

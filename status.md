@@ -8,7 +8,7 @@
 - Fork sync automation exists in both repos:
   - `scripts/sync-fork-fixes.sh`
   - `.github/workflows/sync-fork-fixes.yml`
-- Current app version: `9.6.5-1` (`versionCode 2008`)
+- Current app version: `9.6.5-2` (`versionCode 2009`)
 
 ## Repository Layout
 
@@ -63,31 +63,31 @@ Primary output:
 
 ## Sign APK (Installable)
 
-Example flow used for test installable releases:
+Example flow for installable releases:
 
 ```bash
 cd Kaisoku
 keytool -genkeypair -v \
-  -keystore releases/signing/kaisoku-test-release.jks \
+  -keystore releases/signing/kaisoku-release-<yyyymmdd>.jks \
   -storepass '***' -keypass '***' \
   -alias 'kaisoku-release' -keyalg RSA -keysize 4096 -validity 10000 \
   -dname 'CN=Kaisoku Release, OU=Development, O=Kaisoku, L=NA, ST=NA, C=US'
 
 apksigner sign \
-  --ks releases/signing/kaisoku-test-release.jks \
+  --ks releases/signing/kaisoku-release-<yyyymmdd>.jks \
   --ks-key-alias kaisoku-release \
   --ks-pass pass:'***' \
   --key-pass pass:'***' \
-  --out releases/kaisoku-release-installable.apk \
+  --out releases/kaisoku-v<version>-installable.apk \
   app/build/outputs/apk/release/app-release-unsigned.apk
 
-apksigner verify --verbose --print-certs releases/kaisoku-release-installable.apk
+apksigner verify --verbose --print-certs releases/kaisoku-v<version>-installable.apk
 ```
 
 ## Publish Release
 
 ```bash
-gh release create <tag> releases/kaisoku-release-installable.apk \
+gh release create <tag> releases/kaisoku-v<version>-installable.apk \
   -R glitch-228/Kaisoku \
   --target devel \
   --title "<title>" \
@@ -97,7 +97,7 @@ gh release create <tag> releases/kaisoku-release-installable.apk \
 Update assets in an existing release:
 
 ```bash
-gh release upload <tag> releases/kaisoku-release-installable.apk -R glitch-228/Kaisoku --clobber
+gh release upload <tag> releases/kaisoku-v<version>-installable.apk -R glitch-228/Kaisoku --clobber
 gh release view <tag> -R glitch-228/Kaisoku
 ```
 
@@ -114,5 +114,9 @@ gh release view <tag> -R glitch-228/Kaisoku
 ## Operational Notes
 
 - Local `releases/` artifacts are intentionally git-ignored.
+- Current local rotated key files (not committed):
+  - `releases/signing/kaisoku-release-20260222.jks`
+  - `releases/signing/kaisoku-release-20260222.credentials.txt`
+  - `releases/signing/kaisoku-release-20260222.cert.txt`
 - Keep production signing keys outside the repo and backed up securely.
 - Prefer small, scoped commits (sync commit, conflict fix commit, release prep commit).
