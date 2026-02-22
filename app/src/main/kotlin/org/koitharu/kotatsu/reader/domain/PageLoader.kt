@@ -287,7 +287,15 @@ class PageLoader @Inject constructor(
 		val pageUrl = getPageUrl(page)
 		check(pageUrl.isNotBlank()) { "Cannot obtain full image url for $page" }
 		if (!skipCache) {
-			cache.get(pageUrl)?.let { return it.toUri() }
+			cache.get(pageUrl)?.let { cachedFile ->
+				if (shouldValidateInkStoryCache(pageUrl, page.source) && !isCachedImageFileValid(cachedFile)) {
+					runInterruptible(Dispatchers.IO) {
+						cachedFile.delete()
+					}
+				} else {
+					return cachedFile.toUri()
+				}
+			}
 		}
 		val uri = pageUrl.toUri()
 		return when {
@@ -310,7 +318,7 @@ class PageLoader @Inject constructor(
 						if (inkStoryXorKey != null) {
 							val decodedBytes = decodeInkStoryXor(it.bytes(), inkStoryXorKey)
 							val decodedMimeType = detectImageMimeType(decodedBytes)
-								?: responseMimeType?.takeIf { mime -> mime.isImage }
+								?: throw IllegalStateException("InkStory decoded payload is not an image")
 							decodedBytes.inputStream().source().use { decodedSource ->
 								cache.set(pageUrl, decodedSource, decodedMimeType)
 							}
@@ -322,6 +330,10 @@ class PageLoader @Inject constructor(
 				}.toUri()
 			}
 		}
+	}
+
+	private suspend fun isCachedImageFileValid(file: File): Boolean = runInterruptible(Dispatchers.IO) {
+		MimeTypes.probeMimeType(file)?.isImage == true
 	}
 
 	private fun isLowRam(): Boolean {
@@ -384,6 +396,14 @@ class PageLoader @Inject constructor(
 			}
 			val key = fragment.removePrefix(INK_STORY_FRAGMENT_PREFIX)
 			return key.takeIf { it.isNotBlank() }?.toByteArray()
+		}
+
+		private fun shouldValidateInkStoryCache(pageUrl: String, mangaSource: MangaSource): Boolean {
+			if (mangaSource.name != MANGA_OVH_SOURCE) {
+				return false
+			}
+			val url = pageUrl.toHttpUrlOrNull() ?: return false
+			return url.host.endsWith("inuko.me") && url.encodedPath.contains("/chapters/")
 		}
 
 		private fun decodeInkStoryXor(source: ByteArray, key: ByteArray): ByteArray {
