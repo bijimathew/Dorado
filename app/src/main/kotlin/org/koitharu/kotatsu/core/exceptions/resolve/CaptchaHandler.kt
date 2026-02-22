@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.LocalizedAppContext
 import org.koitharu.kotatsu.core.db.MangaDatabase
@@ -286,7 +287,7 @@ class CaptchaHandler @Inject constructor(
 		private const val GROUP_CAPTCHA = "org.koitharu.kotatsu.CAPTCHA"
 		private const val GROUP_NOTIFICATION_ID = 34
 		private const val SETTINGS_ACTION_CODE = 3
-		private const val ACTION_DISCARD = "org.koitharu.kotatsu.CAPTCHA_DISCARD"
+		private const val ACTION_DISCARD = "${BuildConfig.APPLICATION_ID}.CAPTCHA_DISCARD"
 		private const val RESOLVE_TIMEOUT = 20_000L
 	}
 }
