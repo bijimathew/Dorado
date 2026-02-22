@@ -9,7 +9,6 @@ SOURCE_FILTER=""
 SOURCE_SPECS=(
   "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel"
   "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel"
-  "yumemi|https://github.com/YumemiProject/Yumemi.git|devel"
 )
 
 log() {
@@ -32,7 +31,7 @@ Options:
   --push                  Push target branch to origin after successful apply.
   --branch <name>         Target branch to sync (default: devel).
   --sources <csv>         Comma-separated source remotes to include.
-                          Available: upstream,redo,yumemi
+                          Available: upstream,redo
   -h, --help              Show this help.
 EOF
 }

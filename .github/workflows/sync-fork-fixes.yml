@@ -14,9 +14,9 @@ on:
         default: true
         type: boolean
       sources:
-        description: "Comma-separated sources: upstream,redo,yumemi"
+        description: "Comma-separated sources: upstream,redo"
         required: false
-        default: "upstream,redo,yumemi"
+        default: "upstream,redo"
         type: string
   schedule:
     - cron: "37 4 * * 1"
