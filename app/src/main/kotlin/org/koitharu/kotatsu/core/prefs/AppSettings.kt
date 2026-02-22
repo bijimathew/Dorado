@@ -116,8 +116,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getEnumValue(KEY_LIST_MODE_FAVORITES, listMode)
 		set(value) = prefs.edit { putEnumValue(KEY_LIST_MODE_FAVORITES, value) }
 
-	val isTagsWarningsEnabled: Boolean
-		get() = prefs.getBoolean(KEY_TAGS_WARNINGS, true)
 
 	var isNsfwContentDisabled: Boolean
 		get() = prefs.getBoolean(KEY_DISABLE_NSFW, false)
@@ -751,8 +749,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_EXIT_CONFIRM = "exit_confirm"
 		const val KEY_INCOGNITO_MODE = "incognito"
 		const val KEY_READER_MULTITASK = "reader_multitask"
-		const val KEY_SYNC = "sync"
-		const val KEY_SYNC_SETTINGS = "sync_settings"
 		const val KEY_READER_BAR = "reader_bar"
 		const val KEY_READER_BAR_TRANSPARENT = "reader_bar_transparent"
 		const val KEY_READER_CHAPTER_TOAST = "reader_chapter_toast"
@@ -816,7 +812,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_BACKUP_TG_ENABLED = "backup_periodic_tg_enabled"
 		const val KEY_BACKUP_TG_CHAT = "backup_periodic_tg_chat_id"
 		const val KEY_MANGA_LIST_BADGES = "manga_list_badges"
-		const val KEY_TAGS_WARNINGS = "tags_warnings"
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
 		const val KEY_DISCORD_TOKEN = "discord_token"
@@ -826,7 +821,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_IGNORE_DOZE = "ignore_dose"
 		const val KEY_TRACKER_DEBUG = "tracker_debug"
 		const val KEY_LINK_WEBLATE = "about_app_translation"
-		const val KEY_LINK_TELEGRAM = "about_telegram"
+		const val KEY_LINK_DISCORD = "about_discord"
 		const val KEY_LINK_GITHUB = "about_github"
 		const val KEY_LINK_MANUAL = "about_help"
 		const val KEY_PROXY_TEST = "proxy_test"

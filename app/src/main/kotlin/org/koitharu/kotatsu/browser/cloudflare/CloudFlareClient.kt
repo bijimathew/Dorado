@@ -9,7 +9,7 @@ import org.koitharu.kotatsu.parsers.network.CloudFlareHelper
 
 private const val LOOP_COUNTER = 3
 
-class CloudFlareClient(
+open class CloudFlareClient(
 	private val cookieJar: MutableCookieJar,
 	private val callback: CloudFlareCallback,
 	adBlock: AdBlock,
