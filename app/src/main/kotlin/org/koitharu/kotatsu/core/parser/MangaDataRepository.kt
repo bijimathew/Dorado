@@ -89,6 +89,18 @@ class MangaDataRepository @Inject constructor(
 		return map
 	}
 
+	suspend fun getOverrides(mangaIds: Collection<Long>): LongObjectMap<MangaOverride> {
+		if (mangaIds.isEmpty()) {
+			return MutableLongObjectMap(0)
+		}
+		val entities = db.getPreferencesDao().getOverrides(mangaIds.toLongArray())
+		val map = MutableLongObjectMap<MangaOverride>(entities.size)
+		for (entity in entities) {
+			map[entity.mangaId] = entity.getOverrideOrNull() ?: continue
+		}
+		return map
+	}
+
 	suspend fun setOverride(manga: Manga, override: MangaOverride?) {
 		db.withTransaction {
 			storeManga(manga, replaceExisting = false)

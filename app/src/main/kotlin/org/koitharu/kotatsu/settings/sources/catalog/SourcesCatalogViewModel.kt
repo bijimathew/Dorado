@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
@@ -57,7 +58,7 @@ class SourcesCatalogViewModel @Inject constructor(
 	val contentTypes = MutableStateFlow<List<ContentType>>(emptyList())
 
 	val content: StateFlow<List<ListModel>> = combine(
-		searchQuery,
+		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT),
 		appliedFilter,
 		db.invalidationTrackerFlow(TABLE_SOURCES),
 	) { q, f, _ ->
@@ -143,5 +144,9 @@ class SourcesCatalogViewModel @Inject constructor(
 		} else {
 			result
 		}
+	}
+
+	private companion object {
+		private const val SEARCH_DEBOUNCE_TIMEOUT = 180L
 	}
 }

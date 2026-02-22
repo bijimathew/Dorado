@@ -77,6 +77,13 @@ class LocalMangaIndex @Inject constructor(
 		return db.getLocalMangaIndexDao().findPath(mangaId) != null
 	}
 
+	suspend fun getSavedIds(mangaIds: Collection<Long>): Set<Long> {
+		if (mangaIds.isEmpty()) {
+			return emptySet()
+		}
+		return db.getLocalMangaIndexDao().findExistingIds(mangaIds.toLongArray()).toSet()
+	}
+
 	suspend fun put(manga: LocalManga) = mutex.withLock {
 		db.withTransaction {
 			upsert(manga)

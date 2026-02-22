@@ -7,7 +7,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -72,14 +75,22 @@ abstract class MangaListViewModel(
 			mangaDataRepository.observeOverridesTrigger(emitInitialState = true),
 			mangaDataRepository.observeFavoritesTrigger(emitInitialState = true),
 			localStorageChanges.onStart { emit(null) },
-		),
+		).map { Unit }
+			.conflate()
+			.debounce(TRIGGERS_DEBOUNCE_MS),
 		settings.observeChanges().filter { key ->
 			key == AppSettings.KEY_PROGRESS_INDICATORS
 				|| key == AppSettings.KEY_TRACKER_ENABLED
 				|| key == AppSettings.KEY_QUICK_FILTER
 				|| key == AppSettings.KEY_MANGA_LIST_BADGES
-		}.onStart { emit("") },
+		}.onStart { emit("") }
+			.map { Unit }
+			.conflate(),
 	) { mode, _, _ ->
 		mode
+	}
+
+	private companion object {
+		private const val TRIGGERS_DEBOUNCE_MS = 120L
 	}
 }

@@ -6,6 +6,8 @@ import androidx.annotation.ColorRes
 import androidx.annotation.IntDef
 import dagger.Reusable
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.prefs.AppSettings
@@ -58,9 +60,11 @@ class MangaListMapper @Inject constructor(
 		@Flags flags: Int = DEFAULTS,
 	) {
 		val options = getOptions(flags)
-		val overrides = dataRepository.getOverrides()
+		val ids = manga.mapTo(LinkedHashSet(manga.size)) { it.id }
+		val badges = loadBadges(ids, options)
+		val overrides = dataRepository.getOverrides(ids)
 		manga.mapTo(destination) {
-			toListModelImpl(it, mode, options, overrides[it.id])
+			toListModelImpl(it, mode, overrides[it.id], badges[it.id] ?: EmptyBadges)
 		}
 	}
 
@@ -68,12 +72,15 @@ class MangaListMapper @Inject constructor(
 		manga: Manga,
 		mode: ListMode,
 		@Flags flags: Int = DEFAULTS,
-	): MangaListModel = toListModelImpl(
-		manga = manga,
-		mode = mode,
-		options = getOptions(flags),
-		override = dataRepository.getOverride(manga.id),
-	)
+	): MangaListModel {
+		val options = getOptions(flags)
+		return toListModelImpl(
+			manga = manga,
+			mode = mode,
+			override = dataRepository.getOverride(manga.id),
+			badges = getBadges(manga.id, options),
+		)
+	}
 
 	suspend fun toFeedItem(logItem: TrackingLogItem) = FeedItem(
 		id = logItem.id,
@@ -91,78 +98,119 @@ class MangaListMapper @Inject constructor(
 		)
 	}
 
-	private suspend fun toCompactListModel(
+	private fun toCompactListModel(
 		manga: Manga,
-		@Options options: Int,
 		override: MangaOverride?,
+		badges: MangaBadges,
 	) = MangaCompactListModel(
 		manga = manga,
 		override = override,
 		subtitle = manga.tags.joinToString(", ") { it.title },
-		counter = getCounter(manga.id, options),
+		counter = badges.counter,
 	)
 
-	private suspend fun toDetailedListModel(
+	private fun toDetailedListModel(
 		manga: Manga,
-		@Options options: Int,
 		override: MangaOverride?,
+		badges: MangaBadges,
 	) = MangaDetailedListModel(
 		subtitle = manga.altTitles.firstOrNull(),
 		manga = manga,
 		override = override,
-		counter = getCounter(manga.id, options),
-		progress = getProgress(manga.id, options),
-		isFavorite = isFavorite(manga.id, options),
-		isSaved = isSaved(manga.id, options),
+		counter = badges.counter,
+		progress = badges.progress,
+		isFavorite = badges.isFavorite,
+		isSaved = badges.isSaved,
 		tags = mapTags(manga.tags),
 	)
 
-	private suspend fun toGridModel(
+	private fun toGridModel(
 		manga: Manga,
-		@Options options: Int,
-		override: MangaOverride?
+		override: MangaOverride?,
+		badges: MangaBadges,
 	) = MangaGridModel(
 		manga = manga,
 		override = override,
-		counter = getCounter(manga.id, options),
-		progress = getProgress(manga.id, options),
-		isFavorite = isFavorite(manga.id, options),
-		isSaved = isSaved(manga.id, options),
+		counter = badges.counter,
+		progress = badges.progress,
+		isFavorite = badges.isFavorite,
+		isSaved = badges.isSaved,
 	)
 
-	private suspend fun toListModelImpl(
+	private fun toListModelImpl(
 		manga: Manga,
 		mode: ListMode,
-		@Options options: Int,
 		override: MangaOverride?,
+		badges: MangaBadges,
 	): MangaListModel = when (mode) {
-		ListMode.LIST -> toCompactListModel(manga, options, override)
-		ListMode.DETAILED_LIST -> toDetailedListModel(manga, options, override)
-		ListMode.GRID -> toGridModel(manga, options, override)
+		ListMode.LIST -> toCompactListModel(manga, override, badges)
+		ListMode.DETAILED_LIST -> toDetailedListModel(manga, override, badges)
+		ListMode.GRID -> toGridModel(manga, override, badges)
 	}
 
-	private suspend fun getCounter(mangaId: Long, @Options options: Int): Int {
-		return if (settings.isTrackerEnabled) {
+	private suspend fun loadBadges(ids: Set<Long>, @Options options: Int): Map<Long, MangaBadges> {
+		if (ids.isEmpty()) {
+			return emptyMap()
+		}
+		return coroutineScope {
+			val countersDeferred = if (settings.isTrackerEnabled) {
+				async { trackingRepository.getNewChaptersCountMap(ids) }
+			} else {
+				null
+			}
+			val progressDeferred = if (options.isBadgeEnabled(PROGRESS)) {
+				async { historyRepository.getProgressMap(ids, settings.progressIndicatorMode) }
+			} else {
+				null
+			}
+			val favoritesDeferred = if (options.isBadgeEnabled(FAVORITE)) {
+				async { favouritesRepository.getFavoriteIds(ids) }
+			} else {
+				null
+			}
+			val savedDeferred = if (options.isBadgeEnabled(SAVED)) {
+				async { localMangaIndex.getSavedIds(ids) }
+			} else {
+				null
+			}
+
+			val counters = countersDeferred?.await().orEmpty()
+			val progress = progressDeferred?.await().orEmpty()
+			val favorites = favoritesDeferred?.await().orEmpty()
+			val saved = savedDeferred?.await().orEmpty()
+
+			HashMap<Long, MangaBadges>(ids.size).apply {
+				for (id in ids) {
+					this[id] = MangaBadges(
+						counter = counters[id] ?: 0,
+						progress = progress[id],
+						isFavorite = id in favorites,
+						isSaved = id in saved,
+					)
+				}
+			}
+		}
+	}
+
+	private suspend fun getBadges(mangaId: Long, @Options options: Int): MangaBadges {
+		val counter = if (settings.isTrackerEnabled) {
 			trackingRepository.getNewChaptersCount(mangaId)
 		} else {
 			0
 		}
-	}
-
-	private suspend fun getProgress(mangaId: Long, @Options options: Int): ReadingProgress? {
-		return if (options.isBadgeEnabled(PROGRESS)) {
+		val progress = if (options.isBadgeEnabled(PROGRESS)) {
 			historyRepository.getProgress(mangaId, settings.progressIndicatorMode)
 		} else {
 			null
 		}
-	}
-
-	private suspend fun isFavorite(mangaId: Long, @Options options: Int): Boolean {
-		return options.isBadgeEnabled(FAVORITE) && favouritesRepository.isFavorite(mangaId)
-	}
-
-	private suspend fun isSaved(mangaId: Long, @Options options: Int): Boolean {
-		return options.isBadgeEnabled(SAVED) && mangaId in localMangaIndex
+		val isFavorite = options.isBadgeEnabled(FAVORITE) && favouritesRepository.isFavorite(mangaId)
+		val isSaved = options.isBadgeEnabled(SAVED) && mangaId in localMangaIndex
+		return MangaBadges(
+			counter = counter,
+			progress = progress,
+			isFavorite = isFavorite,
+			isSaved = isSaved,
+		)
 	}
 
 	@ColorRes
@@ -189,12 +237,25 @@ class MangaListMapper @Inject constructor(
 	@Retention(AnnotationRetention.SOURCE)
 	private annotation class Options
 
+	private data class MangaBadges(
+		val counter: Int,
+		val progress: ReadingProgress?,
+		val isFavorite: Boolean,
+		val isSaved: Boolean,
+	)
+
 	companion object {
 
 		private const val NONE = 0
 		private const val SAVED = 1
 		private const val PROGRESS = 2
 		private const val FAVORITE = 4
+		private val EmptyBadges = MangaBadges(
+			counter = 0,
+			progress = null,
+			isFavorite = false,
+			isSaved = false,
+		)
 
 		const val DEFAULTS = NONE
 		const val NO_SAVED = SAVED
