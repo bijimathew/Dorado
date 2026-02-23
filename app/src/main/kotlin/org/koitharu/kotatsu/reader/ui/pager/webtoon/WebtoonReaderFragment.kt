@@ -29,6 +29,8 @@ import org.koitharu.kotatsu.reader.ui.pager.BaseReaderAdapter
 import org.koitharu.kotatsu.reader.ui.pager.BaseReaderFragment
 import org.koitharu.kotatsu.reader.ui.pager.ReaderPage
 import javax.inject.Inject
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>(),
@@ -182,7 +184,7 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 	override fun switchPageBy(delta: Int) {
 		with(requireViewBinding().recyclerView) {
 			if (isAnimationEnabled()) {
-				smoothScrollBy(0, (height * 0.9).toInt() * delta, scrollInterpolator)
+				smoothScrollByAdaptive((height * 0.9).toInt() * delta)
 			} else {
 				nestedScrollBy(0, (height * 0.9).toInt() * delta)
 			}
@@ -195,7 +197,7 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 
 	override fun scrollBy(delta: Int, smooth: Boolean): Boolean {
 		if (smooth && isAnimationEnabled()) {
-			requireViewBinding().recyclerView.smoothScrollBy(0, delta, scrollInterpolator)
+			requireViewBinding().recyclerView.smoothScrollByAdaptive(delta)
 		} else {
 			requireViewBinding().recyclerView.nestedScrollBy(0, delta)
 		}
@@ -253,6 +255,24 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		return getChildAdapterPosition(view)
 	}
 
+	private fun RecyclerView.smoothScrollByAdaptive(deltaY: Int) {
+		if (deltaY == 0) {
+			return
+		}
+		val viewportHeight = height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+		val distance = abs(deltaY)
+		val refreshRate = display?.refreshRate?.takeIf { it in MIN_REFRESH_RATE..MAX_REFRESH_RATE } ?: DEFAULT_REFRESH_RATE
+		val frameTimeMs = 1000f / refreshRate
+		val targetSpeedPxPerSec = viewportHeight * VIEWPORTS_PER_SECOND
+		val durationByDistance = (distance / targetSpeedPxPerSec) * 1000f
+		val minDuration = frameTimeMs * MIN_SCROLL_FRAMES
+		val maxDuration = frameTimeMs * MAX_SCROLL_FRAMES
+		val durationMs = durationByDistance
+			.coerceIn(minDuration, maxDuration)
+			.roundToInt()
+		smoothScrollBy(0, deltaY, scrollInterpolator, durationMs)
+	}
+
 	private fun TextView.updateFeedback(progress: Float) {
 		val clamped = progress.coerceIn(0f, 1.2f)
 		val isReady = clamped >= 1f
@@ -287,5 +307,15 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		if (this.text != text) {
 			this.text = text
 		}
+	}
+
+	companion object {
+
+		private const val VIEWPORTS_PER_SECOND = 3.2f
+		private const val MIN_SCROLL_FRAMES = 10f
+		private const val MAX_SCROLL_FRAMES = 72f
+		private const val DEFAULT_REFRESH_RATE = 60f
+		private const val MIN_REFRESH_RATE = 30f
+		private const val MAX_REFRESH_RATE = 240f
 	}
 }
