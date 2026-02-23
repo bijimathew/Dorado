@@ -28,6 +28,7 @@ class ReadingProgressView @JvmOverloads constructor(
 
 	private val percentPattern = context.getString(R.string.percent_string_pattern)
 	private var percentAnimator: ValueAnimator? = null
+	private var animatedTargetProgress: ReadingProgress? = null
 	private val animationDuration = context.getAnimationDuration(android.R.integer.config_shortAnimTime)
 
 	@StyleRes
@@ -39,16 +40,7 @@ class ReadingProgressView @JvmOverloads constructor(
 			cancelAnimation()
 			getProgressDrawable().also {
 				it.percent = value?.percent ?: PROGRESS_NONE
-				it.text = when (value?.mode) {
-					null,
-					NONE -> ""
-
-					PERCENT_READ -> percentPattern.format(ReadingProgress.percentToString(value.percent))
-					PERCENT_LEFT -> "-" + percentPattern.format(ReadingProgress.percentToString(value.percentLeft))
-
-					CHAPTERS_READ -> value.chapters.toString()
-					CHAPTERS_LEFT -> "-" + value.chaptersLeft.toString()
-				}
+				it.text = formatProgressText(value)
 			}
 		}
 
@@ -72,11 +64,16 @@ class ReadingProgressView @JvmOverloads constructor(
 			if (isRunning) end()
 		}
 		percentAnimator = null
+		animatedTargetProgress = null
 	}
 
 	override fun onAnimationUpdate(animation: ValueAnimator) {
 		val p = animation.animatedValue as Float
-		getProgressDrawable().percent = p
+		val value = (animatedTargetProgress ?: progress)?.copy(percent = p)
+		getProgressDrawable().also {
+			it.percent = p
+			it.text = formatProgressText(value)
+		}
 	}
 
 	override fun onAnimationStart(animation: Animator) = Unit
@@ -84,10 +81,19 @@ class ReadingProgressView @JvmOverloads constructor(
 	override fun onAnimationEnd(animation: Animator) {
 		if (percentAnimator === animation) {
 			percentAnimator = null
+			val target = animatedTargetProgress
+			animatedTargetProgress = null
+			if (target != null) {
+				progress = target
+			}
 		}
 	}
 
-	override fun onAnimationCancel(animation: Animator) = Unit
+	override fun onAnimationCancel(animation: Animator) {
+		if (percentAnimator === animation) {
+			animatedTargetProgress = null
+		}
+	}
 
 	override fun onAnimationRepeat(animation: Animator) = Unit
 
@@ -106,6 +112,7 @@ class ReadingProgressView @JvmOverloads constructor(
 		}
 		percentAnimator?.cancel()
 		val currentPercent = currentDrawable.percent.coerceAtLeast(0f)
+		animatedTargetProgress = value
 		progress = value.copy(percent = currentPercent)
 		percentAnimator = ValueAnimator.ofFloat(
 			currentDrawable.percent.coerceAtLeast(0f),
@@ -122,6 +129,18 @@ class ReadingProgressView @JvmOverloads constructor(
 	private fun cancelAnimation() {
 		percentAnimator?.cancel()
 		percentAnimator = null
+		animatedTargetProgress = null
+	}
+
+	private fun formatProgressText(value: ReadingProgress?): String = when (value?.mode) {
+		null,
+		NONE -> ""
+
+		PERCENT_READ -> percentPattern.format(ReadingProgress.percentToString(value.percent))
+		PERCENT_LEFT -> "-" + percentPattern.format(ReadingProgress.percentToString(value.percentLeft))
+
+		CHAPTERS_READ -> value.chapters.toString()
+		CHAPTERS_LEFT -> "-" + value.chaptersLeft.toString()
 	}
 
 	private fun peekProgressDrawable(): ReadingProgressDrawable? {
