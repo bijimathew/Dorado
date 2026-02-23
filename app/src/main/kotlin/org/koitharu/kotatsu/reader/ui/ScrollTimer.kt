@@ -25,10 +25,12 @@ import org.koitharu.kotatsu.core.prefs.observeAsFlow
 import org.koitharu.kotatsu.core.util.ext.resolveDp
 import kotlin.math.roundToLong
 
-private const val MAX_DELAY = 32L
 private const val MAX_SWITCH_DELAY = 10_000L
+private const val MIN_SWITCH_DELAY = 300L
 private const val INTERACTION_SKIP_MS = 2_000L
-private const val SPEED_FACTOR_DELTA = 0.02f
+private const val TICK_DELAY_MS = 8L
+private const val BASE_SCROLL_DELAY_MS = 32f
+private const val SPEED_FACTOR_CHANGE_PER_SEC = 0.65f
 
 class ScrollTimer @AssistedInject constructor(
 	@Assisted resources: Resources,
@@ -39,13 +41,14 @@ class ScrollTimer @AssistedInject constructor(
 
 	private val coroutineScope = lifecycleOwner.lifecycleScope
 	private var job: Job? = null
-	private var delayMs: Long = 10L
+	private var scrollSpeedMultiplier: Float = MIN_MULTIPLIER
 	var pageSwitchDelay: Long = 100L
 		private set
 	private var resumeAt = 0L
 	private var isTouchDown = MutableStateFlow(false)
 	private val isRunning = MutableStateFlow(false)
 	private val scrollDelta = resources.resolveDp(1)
+	private val baseScrollSpeedPxPerSec = (scrollDelta * 1000f) / BASE_SCROLL_DELAY_MS
 
 	val isActive: StateFlow<Boolean>
 		get() = isRunning
@@ -84,52 +87,55 @@ class ScrollTimer @AssistedInject constructor(
 	}
 
 	private fun onSpeedChanged(speed: Float) {
-		if (speed <= 0f) {
-			delayMs = 0L
-			pageSwitchDelay = 0L
-		} else {
-			val speedFactor = 1f - speed
-			delayMs = (MAX_DELAY * speedFactor).roundToLong()
-			pageSwitchDelay = (MAX_SWITCH_DELAY * speedFactor).roundToLong()
-		}
-		if ((job == null) != (delayMs == 0L)) {
-			restartJob()
-		}
+		scrollSpeedMultiplier = speedToMultiplier(speed)
+		pageSwitchDelay = (MAX_SWITCH_DELAY / scrollSpeedMultiplier)
+			.roundToLong()
+			.coerceIn(MIN_SWITCH_DELAY, MAX_SWITCH_DELAY)
 	}
 
 	private fun restartJob() {
 		job?.cancel()
 		resumeAt = 0L
-		if (!isRunning.value || delayMs == 0L) {
+		if (!isRunning.value) {
 			job = null
 			return
 		}
 		job = coroutineScope.launch {
-			var accumulator = 0L
+			var chapterSwitchAccumulator = 0L
+			var scrollAccumulator = 0f
 			var speedFactor = 1f
+			val speedStepPerTick = SPEED_FACTOR_CHANGE_PER_SEC * (TICK_DELAY_MS / 1000f)
 			while (isActive) {
 				if (isPaused()) {
-					speedFactor = (speedFactor - SPEED_FACTOR_DELTA).coerceAtLeast(0f)
+					speedFactor = (speedFactor - speedStepPerTick).coerceAtLeast(0f)
 				} else if (speedFactor < 1f) {
-					speedFactor = (speedFactor + SPEED_FACTOR_DELTA).coerceAtMost(1f)
+					speedFactor = (speedFactor + speedStepPerTick).coerceAtMost(1f)
 				}
-				if (speedFactor == 1f) {
-					delay(delayMs)
-				} else if (speedFactor == 0f) {
+				if (speedFactor == 0f) {
 					delayUntilResumed()
 					continue
-				} else {
-					delay((delayMs * (1f + speedFactor * 2)).toLong())
 				}
+				delay(TICK_DELAY_MS)
 				if (!listener.isReaderResumed()) {
 					continue
 				}
-				if (!listener.scrollBy(scrollDelta, false)) {
-					accumulator += delayMs
+
+				val effectiveMultiplier = scrollSpeedMultiplier * speedFactor
+				scrollAccumulator += baseScrollSpeedPxPerSec * effectiveMultiplier * (TICK_DELAY_MS / 1000f)
+				val scrollByPx = scrollAccumulator.toInt()
+				if (scrollByPx <= 0) {
+					continue
 				}
-				if (accumulator >= pageSwitchDelay) {
-					listener.switchPageBy(1)
-					accumulator -= pageSwitchDelay
+				scrollAccumulator -= scrollByPx
+
+				if (!listener.scrollBy(scrollByPx, false)) {
+					chapterSwitchAccumulator += TICK_DELAY_MS
+					if (chapterSwitchAccumulator >= pageSwitchDelay) {
+						listener.switchPageBy(1)
+						chapterSwitchAccumulator = 0L
+					}
+				} else {
+					chapterSwitchAccumulator = 0L
 				}
 			}
 		}
@@ -159,5 +165,16 @@ class ScrollTimer @AssistedInject constructor(
 			lifecycleOwner: LifecycleOwner,
 			listener: ReaderControlDelegate.OnInteractionListener,
 		): ScrollTimer
+	}
+
+	companion object {
+
+		private const val MIN_MULTIPLIER = 0.1f
+		private const val MAX_MULTIPLIER = 10.0f
+
+		fun speedToMultiplier(speed: Float): Float {
+			return (MIN_MULTIPLIER + (MAX_MULTIPLIER - MIN_MULTIPLIER) * speed.coerceIn(0f, 1f))
+				.coerceIn(MIN_MULTIPLIER, MAX_MULTIPLIER)
+		}
 	}
 }

@@ -99,10 +99,7 @@ class ScrollTimerControlView @JvmOverloads constructor(
 	}
 
 	override fun getFormattedValue(value: Float): String {
-		val valueFrom = binding.sliderTimer.valueFrom
-		val valueTo = binding.sliderTimer.valueTo
-		val percent = (value - valueFrom) / (valueTo - valueFrom)
-		return labelPattern.format(0.1 + percent * 10) // just something to display
+		return labelPattern.format(ScrollTimer.speedToMultiplier(value))
 	}
 
 	override fun onValueChange(
