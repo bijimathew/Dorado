@@ -148,6 +148,8 @@ class DetailsActivity :
 		infoBinding.textViewLocal.setOnClickListener(this)
 		infoBinding.textViewSource.setOnClickListener(this)
 		viewBinding.imageViewCover.setOnClickListener(this)
+		viewBinding.textViewTitle.setTextIsSelectable(false)
+		viewBinding.textViewSubtitle.setTextIsSelectable(false)
 		viewBinding.textViewTitle.setOnClickListener(this)
 		viewBinding.textViewSubtitle.setOnClickListener(this)
 		viewBinding.buttonDescriptionMore.setOnClickListener(this)
@@ -156,8 +158,6 @@ class DetailsActivity :
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
 		viewBinding.textViewDescription.viewTreeObserver.addOnDrawListener(this)
-		viewBinding.textViewTitle.setTextIsSelectable(false)
-		viewBinding.textViewSubtitle.setTextIsSelectable(false)
 		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
