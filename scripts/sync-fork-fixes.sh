@@ -7,9 +7,9 @@ TARGET_BRANCH="devel"
 SOURCE_FILTER=""
 
 SOURCE_SPECS=(
-  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel|"
-  "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel|upstream"
-  "futon|https://github.com/AppFuton/Futon.git|devel|upstream"
+  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel||auto"
+  "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel|upstream|auto"
+  "futon|https://github.com/AppFuton/Futon.git|devel|upstream|manual"
 )
 
 log() {
@@ -107,7 +107,7 @@ commit_stability_reason() {
     return 0
   fi
 
-  if git show --pretty='' --name-only "${sha}" | grep -Eq '(^|/)io/github/landwarderer/futon/'; then
+  if grep -Eq '(^|/)io/github/landwarderer/futon/' < <(git show --pretty='' --name-only "${sha}"); then
     printf 'incompatible-package-path'
     return 0
   fi
@@ -183,6 +183,7 @@ sync_source() {
   local source_branch="$2"
   local source_ref="$3"
   local base_source_name="$4"
+  local source_mode="${5:-auto}"
   local base_ref=""
   local baseline range
   local candidate_count
@@ -230,10 +231,14 @@ sync_source() {
   skipped_count="${#skipped_commits[@]}"
 
   if [[ "${APPLY}" != "true" ]]; then
+    local mode_note=""
+    if [[ "${source_mode}" == "manual" ]]; then
+      mode_note=", mode:manual-review"
+    fi
     if [[ -n "${base_ref}" ]]; then
-      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count} (range ${range}, excluding ${base_ref} and HEAD)"
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note} (range ${range}, excluding ${base_ref} and HEAD)"
     else
-      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count} (range ${range}, excluding HEAD)"
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note} (range ${range}, excluding HEAD)"
     fi
     if (( stable_count > 0 )); then
       for sha in "${stable_commits[@]:0:10}"; do
@@ -254,6 +259,11 @@ sync_source() {
         printf '    ... (%d more skipped commits)\n' "$((skipped_count - 5))"
       fi
     fi
+    return 0
+  fi
+
+  if [[ "${source_mode}" == "manual" ]]; then
+    log "Skipping auto-apply for ${source_ref}: source is marked as manual-review."
     return 0
   fi
 
@@ -349,9 +359,10 @@ fi
 declare -A SOURCE_REFS
 declare -A SOURCE_BRANCHES
 declare -A SOURCE_BASES
+declare -A SOURCE_MODES
 
 for spec in "${SOURCE_SPECS[@]}"; do
-  IFS='|' read -r name url branch base_name <<<"${spec}"
+  IFS='|' read -r name url branch base_name mode <<<"${spec}"
   if ! source_enabled "${name}"; then
     log "Skipping source ${name} due to --sources filter."
     continue
@@ -364,6 +375,7 @@ for spec in "${SOURCE_SPECS[@]}"; do
   SOURCE_REFS["${name}"]="${name}/${branch}"
   SOURCE_BRANCHES["${name}"]="${branch}"
   SOURCE_BASES["${name}"]="${base_name}"
+  SOURCE_MODES["${name}"]="${mode:-auto}"
 done
 
 for spec in "${SOURCE_SPECS[@]}"; do
@@ -374,7 +386,7 @@ for spec in "${SOURCE_SPECS[@]}"; do
 
   source_ref="${SOURCE_REFS[${name}]}"
   print_divergence "${source_ref}"
-  sync_source "${name}" "${SOURCE_BRANCHES[${name}]}" "${source_ref}" "${SOURCE_BASES[${name}]}" || exit 2
+  sync_source "${name}" "${SOURCE_BRANCHES[${name}]}" "${source_ref}" "${SOURCE_BASES[${name}]}" "${SOURCE_MODES[${name}]}" || exit 2
 done
 
 if [[ "${PUSH}" == "true" ]]; then
