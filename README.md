@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> WIP
+> Fork of kotatsu mashed and vibe-coded out of other forks(red*, fut*, yum*), no guarantee for stability
 
 ---
 
