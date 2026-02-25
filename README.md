@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> Fork of kotatsu mashed and vibe-coded out of other forks(red*, fut*, yum*), no guarantee for stability
+> Fork of kotatsu mashed and vibe-coded out of other forks(red*, fut*, yum*), with some own fixes, no guarantee for stability
 
 ---
 
