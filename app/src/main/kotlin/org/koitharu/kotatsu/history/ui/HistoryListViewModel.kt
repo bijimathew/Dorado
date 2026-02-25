@@ -181,10 +181,15 @@ class HistoryListViewModel @Inject constructor(
 				icon = R.drawable.ic_incognito,
 			)
 		}
+		val mangaModels = mangaListMapper.toListModelList(
+			manga = list.mapTo(ArrayList(list.size)) { it.manga },
+			mode = mode,
+		)
 		val order = sortOrder.value
 		var prevHeader: ListHeader? = null
 		var isEmpty = true
-		for ((manga, history) in list) {
+		for (index in list.indices) {
+			val history = list[index].history
 			isEmpty = false
 			if (grouped) {
 				val header = history.header(order)
@@ -195,7 +200,7 @@ class HistoryListViewModel @Inject constructor(
 					prevHeader = header
 				}
 			}
-			result += mangaListMapper.toListModel(manga, mode)
+			result += mangaModels[index]
 		}
 		if (filters.isNotEmpty() && isEmpty) {
 			result += getEmptyState(hasFilters = true)

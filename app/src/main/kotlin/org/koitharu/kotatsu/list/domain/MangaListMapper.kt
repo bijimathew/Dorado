@@ -90,6 +90,23 @@ class MangaListMapper @Inject constructor(
 		isNew = logItem.isNew,
 	)
 
+	suspend fun toFeedItemList(logItems: Collection<TrackingLogItem>): List<FeedItem> {
+		if (logItems.isEmpty()) {
+			return emptyList()
+		}
+		val ids = logItems.mapTo(LinkedHashSet(logItems.size)) { it.manga.id }
+		val overrides = dataRepository.getOverrides(ids)
+		return logItems.map {
+			FeedItem(
+				id = it.id,
+				override = overrides[it.manga.id],
+				count = it.chapters.size,
+				manga = it.manga,
+				isNew = it.isNew,
+			)
+		}
+	}
+
 	fun mapTags(tags: Collection<MangaTag>) = tags.map {
 		ChipsView.ChipModel(
 			tint = getTagTint(it),

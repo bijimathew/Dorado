@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
@@ -58,12 +60,14 @@ class SourcesCatalogViewModel @Inject constructor(
 	val contentTypes = MutableStateFlow<List<ContentType>>(emptyList())
 
 	val content: StateFlow<List<ListModel>> = combine(
-		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT),
+		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
 		appliedFilter,
 		db.invalidationTrackerFlow(TABLE_SOURCES),
 	) { q, f, _ ->
+		q to f
+	}.mapLatest { (q, f) ->
 		buildSourcesList(f, q)
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	}.stateIn(viewModelScope + Dispatchers.IO, SharingStarted.Eagerly, listOf(LoadingState))
 
 	init {
 		repository.clearNewSourcesBadge()
