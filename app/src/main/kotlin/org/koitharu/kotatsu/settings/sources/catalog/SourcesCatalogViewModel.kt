@@ -9,8 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
@@ -61,13 +63,14 @@ class SourcesCatalogViewModel @Inject constructor(
 
 	val content: StateFlow<List<ListModel>> = combine(
 		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
-		appliedFilter,
+		appliedFilter.map { it }.distinctUntilChanged(),
 		db.invalidationTrackerFlow(TABLE_SOURCES),
 	) { q, f, _ ->
 		q to f
-	}.mapLatest { (q, f) ->
+	}.conflate().mapLatest { (q, f) ->
 		buildSourcesList(f, q)
-	}.stateIn(viewModelScope + Dispatchers.IO, SharingStarted.Eagerly, listOf(LoadingState))
+	}.distinctUntilChanged()
+		.stateIn(viewModelScope + Dispatchers.IO, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), listOf(LoadingState))
 
 	init {
 		repository.clearNewSourcesBadge()
@@ -152,5 +155,6 @@ class SourcesCatalogViewModel @Inject constructor(
 
 	private companion object {
 		private const val SEARCH_DEBOUNCE_TIMEOUT = 180L
+		private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 	}
 }

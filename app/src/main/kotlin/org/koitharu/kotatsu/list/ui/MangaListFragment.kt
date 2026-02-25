@@ -11,6 +11,7 @@ import androidx.annotation.CallSuper
 import androidx.appcompat.view.ActionMode
 import androidx.collection.ArraySet
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -123,10 +124,10 @@ abstract class MangaListFragment :
 		}
 		addMenuProvider(MangaListMenuProvider(this))
 
-		viewModel.listMode.observe(viewLifecycleOwner, ::onListModeChanged)
-		viewModel.gridScale.observe(viewLifecycleOwner, ::onGridScaleChanged)
-		viewModel.isLoading.observe(viewLifecycleOwner, ::onLoadingStateChanged)
-		viewModel.content.observe(viewLifecycleOwner, ::onListChanged)
+		viewModel.listMode.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onListModeChanged)
+		viewModel.gridScale.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onGridScaleChanged)
+		viewModel.isLoading.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onLoadingStateChanged)
+		viewModel.content.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onListChanged)
 		viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(binding.recyclerView, this))
 		viewModel.onActionDone.observeEvent(viewLifecycleOwner, ReversibleActionObserver(binding.recyclerView))
 	}

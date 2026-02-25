@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
@@ -125,14 +127,18 @@ class MangaSourcesRepository @Inject constructor(
 		sortOrder: SourcesSortOrder?,
 	): List<MangaParserSource> {
 		assimilateNewSources()
+		val coroutineContext = currentCoroutineContext()
 		val entities = dao.findAll().toMutableList()
+		coroutineContext.ensureActive()
 		val hideBrokenSources = settings.isBrokenSourcesHidden
 		if (isDisabledOnly && !settings.isAllSourcesEnabled) {
 			entities.removeAll { it.isEnabled }
 		}
+		coroutineContext.ensureActive()
 		if (isNewOnly) {
 			entities.retainAll { it.addedIn == BuildConfig.VERSION_CODE }
 		}
+		coroutineContext.ensureActive()
 		val sources = entities.toSources(
 			skipNsfwSources = settings.isNsfwContentDisabled,
 			sortOrder = sortOrder,
@@ -140,18 +146,32 @@ class MangaSourcesRepository @Inject constructor(
 		).run {
 			mapNotNullTo(ArrayList(size)) { it.mangaSource as? MangaParserSource }
 		}
+		coroutineContext.ensureActive()
 		if (locale != null) {
 			sources.retainAll { it.locale == locale }
 		}
+		coroutineContext.ensureActive()
 		if (excludeBroken && !hideBrokenSources) {
 			sources.removeAll { it.isBroken }
 		}
+		coroutineContext.ensureActive()
 		if (types.isNotEmpty()) {
 			sources.retainAll { it.contentType in types }
 		}
+		coroutineContext.ensureActive()
 		if (!query.isNullOrEmpty()) {
-			sources.retainAll {
-				it.getTitle(context).contains(query, ignoreCase = true) || it.name.contains(query, ignoreCase = true)
+			var checked = 0
+			val iterator = sources.listIterator()
+			while (iterator.hasNext()) {
+				val source = iterator.next()
+				if (!source.getTitle(context).contains(query, ignoreCase = true) &&
+					!source.name.contains(query, ignoreCase = true)
+				) {
+					iterator.remove()
+				}
+				if (++checked % 32 == 0) {
+					coroutineContext.ensureActive()
+				}
 			}
 		}
 		return sources
