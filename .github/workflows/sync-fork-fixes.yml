@@ -14,7 +14,7 @@ on:
         default: true
         type: boolean
       sources:
-        description: "Comma-separated sources: upstream,redo"
+        description: "Comma-separated sources: upstream,redo,futon"
         required: false
         default: "upstream,redo"
         type: string

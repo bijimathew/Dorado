@@ -7,8 +7,9 @@ TARGET_BRANCH="devel"
 SOURCE_FILTER=""
 
 SOURCE_SPECS=(
-  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel"
-  "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel"
+  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel|"
+  "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel|upstream"
+  "futon|https://github.com/AppFuton/Futon.git|devel|upstream"
 )
 
 log() {
@@ -24,14 +25,14 @@ usage() {
   cat <<'EOF'
 Usage: scripts/sync-fork-fixes.sh [options]
 
-Fetches upstream/fork branches and merges them into the local target branch.
+Fetches upstream/fork branches and cherry-picks new stable commits into target.
 
 Options:
-  --apply                 Perform merges. Default is dry-run report only.
+  --apply                 Perform cherry-picks. Default is dry-run report only.
   --push                  Push target branch to origin after successful apply.
   --branch <name>         Target branch to sync (default: devel).
   --sources <csv>         Comma-separated source remotes to include.
-                          Available: upstream,redo
+                          Available: upstream,redo,futon
   -h, --help              Show this help.
 EOF
 }
@@ -74,27 +75,211 @@ print_divergence() {
   log "Divergence HEAD...${source_ref} => local:${local_only} source:${source_only}"
 }
 
-merge_source() {
-  local source_ref="$1"
-  local source_only
-  source_only="$(git rev-list --count "HEAD..${source_ref}")"
+commit_subject() {
+  git log -1 --format='%s' "$1"
+}
 
-  if (( source_only == 0 )); then
+commit_has_runtime_changes() {
+  local sha="$1"
+  local path
+  while IFS= read -r path; do
+    [[ -n "${path}" ]] || continue
+    if [[ ! "${path}" =~ ^(README(\..*)?|docs/.*|\.github/.*|.*\.md|.*\.txt|LICENSE.*|COPYING.*|.*\.(png|jpg|jpeg|gif|svg|webp))$ ]]; then
+      return 0
+    fi
+  done < <(git show --pretty='' --name-only "${sha}")
+  return 1
+}
+
+commit_stability_reason() {
+  local sha="$1"
+  local subject lower_subject
+  subject="$(commit_subject "${sha}")"
+  lower_subject="$(printf '%s' "${subject}" | tr '[:upper:]' '[:lower:]')"
+
+  if [[ "${subject}" =~ ^[0-9]+(\.[0-9]+)+([[:space:][:punct:]].*)?$ ]]; then
+    printf 'release-version-bump'
+    return 0
+  fi
+
+  if [[ "${lower_subject}" =~ (^merge\ |^revert\ |wip|draft|fixup\!|squash\!|tmp|temporary|experiment|debug|rebrand|workflow|ci\/cd|readme|changelog|badge|template|copilot|agents\.md|gitignore) ]]; then
+    printf 'unstable-subject'
+    return 0
+  fi
+
+  if git show --pretty='' --name-only "${sha}" | grep -Eq '(^|/)io/github/landwarderer/futon/'; then
+    printf 'incompatible-package-path'
+    return 0
+  fi
+
+  if ! commit_has_runtime_changes "${sha}"; then
+    printf 'docs-meta-only'
+    return 0
+  fi
+
+  printf 'stable'
+  return 0
+}
+
+find_last_source_sha_from_history() {
+  local source_name="$1"
+  local source_branch="$2"
+  local source_ref="$3"
+  local base_ref="$4"
+  local merge_commit source_sha
+
+  merge_commit="$(git log --merges --grep="chore(sync): merge ${source_name}/${source_branch} into ${TARGET_BRANCH}" --format='%H' -n1 || true)"
+  if [[ -n "${merge_commit}" ]]; then
+    source_sha="$(git rev-parse "${merge_commit}^2" 2>/dev/null || true)"
+    if [[ -n "${source_sha}" ]] &&
+      git merge-base --is-ancestor "${source_sha}" "${source_ref}" 2>/dev/null &&
+      { [[ -z "${base_ref}" ]] || ! git merge-base --is-ancestor "${source_sha}" "${base_ref}" 2>/dev/null; }; then
+      printf '%s' "${source_sha}"
+      return 0
+    fi
+  fi
+
+  while IFS= read -r source_sha; do
+    if [[ -n "${source_sha}" ]] &&
+      git merge-base --is-ancestor "${source_sha}" "${source_ref}" 2>/dev/null &&
+      { [[ -z "${base_ref}" ]] || ! git merge-base --is-ancestor "${source_sha}" "${base_ref}" 2>/dev/null; }; then
+      printf '%s' "${source_sha}"
+      return 0
+    fi
+  done < <(
+    git log "${TARGET_BRANCH}" --grep='cherry picked from commit' --format='%B' |
+      sed -n 's/.*cherry picked from commit \([0-9a-f]\{7,40\}\).*/\1/p'
+  )
+
+  return 1
+}
+
+resolve_baseline() {
+  local source_name="$1"
+  local source_branch="$2"
+  local source_ref="$3"
+  local base_ref="$4"
+  local baseline source_sha
+
+  source_sha="$(find_last_source_sha_from_history "${source_name}" "${source_branch}" "${source_ref}" "${base_ref}" || true)"
+  if [[ -n "${source_sha}" ]]; then
+    printf '%s' "${source_sha}"
+    return 0
+  fi
+
+  if [[ -n "${base_ref}" ]]; then
+    baseline="$(git merge-base "${source_ref}" "${base_ref}")"
+    printf '%s' "${baseline}"
+    return 0
+  fi
+
+  baseline="$(git merge-base HEAD "${source_ref}")"
+  printf '%s' "${baseline}"
+  return 0
+}
+
+sync_source() {
+  local source_name="$1"
+  local source_branch="$2"
+  local source_ref="$3"
+  local base_source_name="$4"
+  local base_ref=""
+  local baseline range
+  local candidate_count
+  local stable_count skipped_count
+  local sha reason subject
+  local candidate_commits=()
+  local stable_commits=()
+  local skipped_commits=()
+
+  if [[ -n "${base_source_name}" ]]; then
+    base_ref="${SOURCE_REFS[${base_source_name}]:-}"
+  fi
+
+  baseline="$(resolve_baseline "${source_name}" "${source_branch}" "${source_ref}" "${base_ref}")"
+  range="${baseline}..${source_ref}"
+
+  if [[ -n "${base_ref}" ]]; then
+    while IFS= read -r sha; do
+      [[ -n "${sha}" ]] || continue
+      candidate_commits+=("${sha}")
+    done < <(git rev-list --reverse --no-merges "${range}" "^${base_ref}" "^HEAD")
+  else
+    while IFS= read -r sha; do
+      [[ -n "${sha}" ]] || continue
+      candidate_commits+=("${sha}")
+    done < <(git rev-list --reverse --no-merges "${range}" "^HEAD")
+  fi
+
+  candidate_count="${#candidate_commits[@]}"
+  if (( candidate_count == 0 )); then
     log "${source_ref} already included."
     return 0
   fi
 
+  for sha in "${candidate_commits[@]}"; do
+    reason="$(commit_stability_reason "${sha}")"
+    if [[ "${reason}" == "stable" ]]; then
+      stable_commits+=("${sha}")
+    else
+      skipped_commits+=("${sha}")
+    fi
+  done
+
+  stable_count="${#stable_commits[@]}"
+  skipped_count="${#skipped_commits[@]}"
+
   if [[ "${APPLY}" != "true" ]]; then
-    log "Dry-run: would merge ${source_ref} (${source_only} commits)."
-    git log --oneline --max-count=5 "HEAD..${source_ref}" | sed 's/^/    /'
+    if [[ -n "${base_ref}" ]]; then
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count} (range ${range}, excluding ${base_ref} and HEAD)"
+    else
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count} (range ${range}, excluding HEAD)"
+    fi
+    if (( stable_count > 0 )); then
+      for sha in "${stable_commits[@]:0:10}"; do
+        subject="$(commit_subject "${sha}")"
+        printf '    + %s %s\n' "${sha:0:12}" "${subject}"
+      done
+      if (( stable_count > 10 )); then
+        printf '    ... (%d more stable commits)\n' "$((stable_count - 10))"
+      fi
+    fi
+    if (( skipped_count > 0 )); then
+      for sha in "${skipped_commits[@]:0:5}"; do
+        subject="$(commit_subject "${sha}")"
+        reason="$(commit_stability_reason "${sha}")"
+        printf '    - %s %s [%s]\n' "${sha:0:12}" "${subject}" "${reason}"
+      done
+      if (( skipped_count > 5 )); then
+        printf '    ... (%d more skipped commits)\n' "$((skipped_count - 5))"
+      fi
+    fi
     return 0
   fi
 
-  log "Merging ${source_ref} (${source_only} commits)..."
-  if ! git merge --no-ff --no-edit -m "chore(sync): merge ${source_ref} into ${TARGET_BRANCH}" "${source_ref}"; then
-    log "Merge conflict on ${source_ref}; aborting merge."
-    git merge --abort || true
-    return 1
+  if (( stable_count == 0 )); then
+    log "No stable commits to apply from ${source_ref} (skipped:${skipped_count})."
+    return 0
+  fi
+
+  log "Applying ${stable_count} stable commits from ${source_ref}..."
+  for sha in "${stable_commits[@]}"; do
+    subject="$(commit_subject "${sha}")"
+    log "Cherry-pick ${sha:0:12} ${subject}"
+    if ! git cherry-pick -x "${sha}"; then
+      if git diff --quiet && git diff --cached --quiet; then
+        log "Commit ${sha:0:12} is already effectively applied. Skipping."
+        git cherry-pick --skip || true
+        continue
+      fi
+      log "Cherry-pick conflict on ${sha:0:12}; aborting."
+      git cherry-pick --abort || true
+      return 1
+    fi
+  done
+
+  if (( skipped_count > 0 )); then
+    log "Skipped ${skipped_count} non-stable commits from ${source_ref}."
   fi
   return 0
 }
@@ -161,8 +346,12 @@ if [[ "${APPLY}" == "true" ]]; then
   git merge --ff-only "origin/${TARGET_BRANCH}"
 fi
 
+declare -A SOURCE_REFS
+declare -A SOURCE_BRANCHES
+declare -A SOURCE_BASES
+
 for spec in "${SOURCE_SPECS[@]}"; do
-  IFS='|' read -r name url branch <<<"${spec}"
+  IFS='|' read -r name url branch base_name <<<"${spec}"
   if ! source_enabled "${name}"; then
     log "Skipping source ${name} due to --sources filter."
     continue
@@ -172,9 +361,20 @@ for spec in "${SOURCE_SPECS[@]}"; do
   log "Fetching ${name}/${branch}..."
   git fetch --prune "${name}" "${branch}"
 
-  source_ref="${name}/${branch}"
+  SOURCE_REFS["${name}"]="${name}/${branch}"
+  SOURCE_BRANCHES["${name}"]="${branch}"
+  SOURCE_BASES["${name}"]="${base_name}"
+done
+
+for spec in "${SOURCE_SPECS[@]}"; do
+  IFS='|' read -r name _ _ _ <<<"${spec}"
+  if [[ -z "${SOURCE_REFS[${name}]:-}" ]]; then
+    continue
+  fi
+
+  source_ref="${SOURCE_REFS[${name}]}"
   print_divergence "${source_ref}"
-  merge_source "${source_ref}" || exit 2
+  sync_source "${name}" "${SOURCE_BRANCHES[${name}]}" "${source_ref}" "${SOURCE_BASES[${name}]}" || exit 2
 done
 
 if [[ "${PUSH}" == "true" ]]; then
