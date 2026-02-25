@@ -4,11 +4,38 @@
 
 - Base app repo: `glitch-228/Kaisoku` (`devel`)
 - Base parsers repo: `glitch-228/kaisoku-parsers` (`master`)
-- User-facing app branding updated to `Kaisoku`.
+- User-facing app branding is `Kaisoku`.
 - Fork sync automation exists in both repos:
   - `scripts/sync-fork-fixes.sh`
   - `.github/workflows/sync-fork-fixes.yml`
-- Current app version: `9.6.5-2` (`versionCode 2009`)
+- Current app version: `9.6.5-10` (`versionCode 2017`)
+- Current parser dependency pin: `cb1bdc33c6` (`[Grouple] Fix description parsing`)
+- Latest release: `v9.6.5-10`
+  - URL: `https://github.com/glitch-228/Kaisoku/releases/tag/v9.6.5-10`
+  - Asset: `kaisoku-v9.6.5-10-installable.apk`
+  - SHA-256: `056799c16a0370cd1fcf309332622266f400631a32ffab27e5b24e139de6b781`
+  - Target commit: `6aa95d448`
+
+## Recent Completed Work (2026-02-22 to 2026-02-23)
+
+- Fixed provider authority conflict for side-by-side install compatibility with upstream Kotatsu.
+- Added global performance/stability optimizations for intermittent long/empty loading:
+  - Batch loading for list badges/counters (history/favorites/saved/tracker) instead of per-item lookups.
+  - Coalescing/debouncing of realtime list remap triggers to reduce UI refresh storms.
+  - Scoped manga override loading to visible IDs.
+  - Debounced source catalog search refresh path.
+- Added MangaOVH parser and completed follow-up fixes:
+  - Domain migration to InkStory API.
+  - Chapter image URL/404 handling.
+  - Encrypted page support and decoding hardening.
+- Fixed Grouple RU source chain regressions:
+  - `div.subject-meta` compatibility chain for modern layout.
+  - Description parsing fallback to `.cr-description__content` to avoid `"No description"`.
+- UI behavior fixes:
+  - Details title opens on first tap (no double-tap needed).
+  - Additional titles are tap-openable with full text dialog/copy.
+  - Manga card progress text no longer desyncs from progress circle when history refreshes.
+- Built, signed, and published releases through `v9.6.5-10`.
 
 ## Repository Layout
 
@@ -38,9 +65,19 @@ scripts/sync-fork-fixes.sh --apply
 scripts/sync-fork-fixes.sh --apply --push
 ```
 
+## Parser Update Lifecycle
+
+- The app does not fetch arbitrary parser repo HEAD at runtime.
+- App consumes parser library pinned in `Kaisoku/gradle/libs.versions.toml` (`parsers = "cb1bdc33c6"`).
+- For parser fixes to ship to users:
+  1. Push parser fix commit to `kaisoku-parsers`.
+  2. Bump parser pin in `Kaisoku`.
+  3. Bump app version.
+  4. Build/sign/publish new app release.
+
 ## Important Sync Notes
 
-- The current default automation source set is intentionally mergeable:
+- Current default automation source set is intentionally mergeable:
   - App: `upstream,redo`
   - Parsers: `upstream,redo`
 - `Yumemi` app history and `Yaka` parser history can require manual conflict work.
@@ -54,7 +91,7 @@ git cherry-pick <commit-sha>
 
 ```bash
 cd Kaisoku
-./gradlew :app:assembleRelease
+./gradlew :app:assembleRelease --no-daemon
 ```
 
 Primary output:
@@ -63,16 +100,10 @@ Primary output:
 
 ## Sign APK (Installable)
 
-Example flow for installable releases:
+Example flow:
 
 ```bash
 cd Kaisoku
-keytool -genkeypair -v \
-  -keystore releases/signing/kaisoku-release-<yyyymmdd>.jks \
-  -storepass '***' -keypass '***' \
-  -alias 'kaisoku-release' -keyalg RSA -keysize 4096 -validity 10000 \
-  -dname 'CN=Kaisoku Release, OU=Development, O=Kaisoku, L=NA, ST=NA, C=US'
-
 apksigner sign \
   --ks releases/signing/kaisoku-release-<yyyymmdd>.jks \
   --ks-key-alias kaisoku-release \
@@ -82,6 +113,7 @@ apksigner sign \
   app/build/outputs/apk/release/app-release-unsigned.apk
 
 apksigner verify --verbose --print-certs releases/kaisoku-v<version>-installable.apk
+sha256sum releases/kaisoku-v<version>-installable.apk
 ```
 
 ## Publish Release
@@ -90,11 +122,11 @@ apksigner verify --verbose --print-certs releases/kaisoku-v<version>-installable
 gh release create <tag> releases/kaisoku-v<version>-installable.apk \
   -R glitch-228/Kaisoku \
   --target devel \
-  --title "<title>" \
+  --title "Kaisoku v<version>" \
   --notes "<notes>"
 ```
 
-Update assets in an existing release:
+Replace asset in existing release:
 
 ```bash
 gh release upload <tag> releases/kaisoku-v<version>-installable.apk -R glitch-228/Kaisoku --clobber
@@ -105,11 +137,12 @@ gh release view <tag> -R glitch-228/Kaisoku
 
 1. Sync app/parsers from upstream + redo.
 2. Resolve conflicts and run build checks.
-3. Build release APK.
-4. Sign APK with stable production keystore.
-5. Push branches.
-6. Publish release + attach signed APK.
-7. Track user-reported issues in GitHub Issues.
+3. Push parser fixes first (if any), then bump parser pin in app.
+4. Bump app version.
+5. Build release APK and sign with production key.
+6. Push app branch.
+7. Publish release and attach signed APK.
+8. Track user-reported issues in GitHub Issues.
 
 ## Operational Notes
 
@@ -119,4 +152,4 @@ gh release view <tag> -R glitch-228/Kaisoku
   - `releases/signing/kaisoku-release-20260222.credentials.txt`
   - `releases/signing/kaisoku-release-20260222.cert.txt`
 - Keep production signing keys outside the repo and backed up securely.
-- Prefer small, scoped commits (sync commit, conflict fix commit, release prep commit).
+- Prefer small, scoped commits (sync commit, parser fix, app pin bump, release bump).
