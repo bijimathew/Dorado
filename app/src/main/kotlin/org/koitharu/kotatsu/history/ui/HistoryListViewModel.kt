@@ -48,6 +48,7 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import kotlinx.coroutines.flow.SharedFlow
 
 private const val PAGE_SIZE = 16
+private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 
 @HiltViewModel
 class HistoryListViewModel @Inject constructor(
@@ -100,7 +101,11 @@ class HistoryListViewModel @Inject constructor(
 		isPaginationReady.set(true)
 	}.catch { e ->
 		emit(listOf(e.toErrorState(canRetry = false)))
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	}.stateIn(
+		viewModelScope + Dispatchers.Default,
+		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
+		listOf(LoadingState),
+	)
 
 	override fun onRefresh() = Unit
 

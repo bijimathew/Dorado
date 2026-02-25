@@ -22,7 +22,7 @@ import kotlin.coroutines.suspendCoroutine
 
 open class BaseListAdapter<T : ListModel> : AsyncListDifferDelegationAdapter<T>(
 	AsyncDifferConfig.Builder(ListModelDiffCallback<T>())
-		.setBackgroundThreadExecutor(DiffExecutor)
+		.setBackgroundThreadExecutor(createDiffExecutor())
 		.build(),
 ), FlowCollector<List<T>?> {
 
@@ -66,6 +66,6 @@ open class BaseListAdapter<T : ListModel> : AsyncListDifferDelegationAdapter<T>(
 	}
 
 	private companion object {
-		val DiffExecutor: Executor = Dispatchers.Default.limitedParallelism(2).asExecutor()
+		fun createDiffExecutor(): Executor = Dispatchers.Default.limitedParallelism(1).asExecutor()
 	}
 }

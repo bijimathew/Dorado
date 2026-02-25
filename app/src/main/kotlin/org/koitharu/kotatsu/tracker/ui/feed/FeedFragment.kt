@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -79,11 +80,11 @@ class FeedFragment :
 		binding.swipeRefreshLayout.setOnRefreshListener(this)
 		addMenuProvider(FeedMenuProvider(binding.recyclerView, viewModel))
 
-		viewModel.isHeaderEnabled.drop(1).observe(viewLifecycleOwner, MenuInvalidator(requireActivity()))
-		viewModel.content.observe(viewLifecycleOwner, feedAdapter)
+		viewModel.isHeaderEnabled.drop(1).observe(viewLifecycleOwner, Lifecycle.State.STARTED, MenuInvalidator(requireActivity()))
+		viewModel.content.observe(viewLifecycleOwner, Lifecycle.State.STARTED, feedAdapter)
 		viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(binding.recyclerView, this))
 		viewModel.onActionDone.observeEvent(viewLifecycleOwner, ReversibleActionObserver(binding.recyclerView))
-		viewModel.isRunning.observe(viewLifecycleOwner, this::onIsTrackerRunningChanged)
+		viewModel.isRunning.observe(viewLifecycleOwner, Lifecycle.State.STARTED, this::onIsTrackerRunningChanged)
 	}
 
 	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {

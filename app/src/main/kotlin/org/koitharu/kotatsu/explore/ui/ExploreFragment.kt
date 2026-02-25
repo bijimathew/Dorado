@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import androidx.appcompat.view.ActionMode
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -82,11 +83,11 @@ class ExploreFragment :
 			checkNotNull(sourceSelectionController).attachToRecyclerView(this)
 		}
 		addMenuProvider(ExploreMenuProvider(router))
-		viewModel.content.observe(viewLifecycleOwner, checkNotNull(exploreAdapter))
+		viewModel.content.observe(viewLifecycleOwner, Lifecycle.State.STARTED, checkNotNull(exploreAdapter))
 		viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(binding.recyclerView, this))
 		viewModel.onOpenManga.observeEvent(viewLifecycleOwner, ::onOpenManga)
 		viewModel.onActionDone.observeEvent(viewLifecycleOwner, ReversibleActionObserver(binding.recyclerView))
-		viewModel.isGrid.observe(viewLifecycleOwner, ::onGridModeChanged)
+		viewModel.isGrid.observe(viewLifecycleOwner, Lifecycle.State.STARTED, ::onGridModeChanged)
 		viewModel.onShowSuggestionsTip.observeEvent(viewLifecycleOwner) {
 			showSuggestionsTip()
 		}

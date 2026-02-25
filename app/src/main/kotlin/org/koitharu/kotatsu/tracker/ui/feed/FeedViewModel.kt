@@ -93,7 +93,11 @@ class FeedViewModel @Inject constructor(
 		result as List<ListModel>
 	}.catch { e ->
 		emit(listOf(e.toErrorState(canRetry = false)))
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	}.stateIn(
+		viewModelScope + Dispatchers.Default,
+		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
+		listOf(LoadingState),
+	)
 
 	init {
 		launchJob(Dispatchers.Default) {
@@ -179,5 +183,9 @@ class FeedViewModel @Inject constructor(
 		} else {
 			filters
 		}
+	}
+
+	private companion object {
+		private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 	}
 }

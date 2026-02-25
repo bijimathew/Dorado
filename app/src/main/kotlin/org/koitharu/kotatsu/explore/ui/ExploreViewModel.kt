@@ -76,7 +76,11 @@ class ExploreViewModel @Inject constructor(
 		} else {
 			createContentFlow()
 		}
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, getLoadingStateList())
+	}.stateIn(
+		viewModelScope + Dispatchers.Default,
+		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
+		getLoadingStateList(),
+	)
 
 	init {
 		launchJob(Dispatchers.Default) {
@@ -209,5 +213,6 @@ class ExploreViewModel @Inject constructor(
 
 		private const val TIP_SUGGESTIONS = "suggestions"
 		private const val SUGGESTIONS_COUNT = 8
+		private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 	}
 }

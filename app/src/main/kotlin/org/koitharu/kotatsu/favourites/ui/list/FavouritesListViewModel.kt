@@ -45,6 +45,7 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import kotlinx.coroutines.flow.SharedFlow
 
 private const val PAGE_SIZE = 16
+private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 
 @HiltViewModel
 class FavouritesListViewModel @Inject constructor(
@@ -88,7 +89,11 @@ class FavouritesListViewModel @Inject constructor(
 		isPaginationReady.set(true)
 	}.catch {
 		emit(listOf(it.toErrorState(canRetry = false)))
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	}.stateIn(
+		viewModelScope + Dispatchers.Default,
+		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
+		listOf(LoadingState),
+	)
 
 	override fun onRefresh() {
 		refreshTrigger.value = Any()

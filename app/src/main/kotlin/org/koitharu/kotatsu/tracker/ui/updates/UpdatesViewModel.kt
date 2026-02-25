@@ -75,7 +75,11 @@ class UpdatesViewModel @Inject constructor(
 		loadingCounter.decrement()
 	}.catch {
 		emit(listOf(it.toErrorState(canRetry = false)))
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	}.stateIn(
+		viewModelScope + Dispatchers.Default,
+		SharingStarted.Eagerly,
+		listOf(LoadingState),
+	)
 
 	init {
 		launchJob(Dispatchers.Default) {
@@ -120,4 +124,5 @@ class UpdatesViewModel @Inject constructor(
 		}
 		return result
 	}
+
 }
