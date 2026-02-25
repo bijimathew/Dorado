@@ -127,6 +127,9 @@ find_last_source_sha_from_history() {
   local source_ref="$3"
   local base_ref="$4"
   local merge_commit source_sha
+  local best_sha=""
+  local best_distance=-1
+  local distance
 
   merge_commit="$(git log --merges --grep="chore(sync): merge ${source_name}/${source_branch} into ${TARGET_BRANCH}" --format='%H' -n1 || true)"
   if [[ -n "${merge_commit}" ]]; then
@@ -134,8 +137,9 @@ find_last_source_sha_from_history() {
     if [[ -n "${source_sha}" ]] &&
       git merge-base --is-ancestor "${source_sha}" "${source_ref}" 2>/dev/null &&
       { [[ -z "${base_ref}" ]] || ! git merge-base --is-ancestor "${source_sha}" "${base_ref}" 2>/dev/null; }; then
-      printf '%s' "${source_sha}"
-      return 0
+      distance="$(git rev-list --count "${source_sha}..${source_ref}")"
+      best_sha="${source_sha}"
+      best_distance="${distance}"
     fi
   fi
 
@@ -143,13 +147,21 @@ find_last_source_sha_from_history() {
     if [[ -n "${source_sha}" ]] &&
       git merge-base --is-ancestor "${source_sha}" "${source_ref}" 2>/dev/null &&
       { [[ -z "${base_ref}" ]] || ! git merge-base --is-ancestor "${source_sha}" "${base_ref}" 2>/dev/null; }; then
-      printf '%s' "${source_sha}"
-      return 0
+      distance="$(git rev-list --count "${source_sha}..${source_ref}")"
+      if [[ -z "${best_sha}" ]] || (( distance < best_distance )); then
+        best_sha="${source_sha}"
+        best_distance="${distance}"
+      fi
     fi
   done < <(
     git log "${TARGET_BRANCH}" --grep='cherry picked from commit' --format='%B' |
       sed -n 's/.*cherry picked from commit \([0-9a-f]\{7,40\}\).*/\1/p'
   )
+
+  if [[ -n "${best_sha}" ]]; then
+    printf '%s' "${best_sha}"
+    return 0
+  fi
 
   return 1
 }
