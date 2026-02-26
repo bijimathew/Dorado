@@ -80,6 +80,7 @@ abstract class MangaListFragment :
 	private var paginationListener: PaginationScrollListener? = null
 	private var selectionController: ListSelectionController? = null
 	private var spanResolver: GridSpanResolver? = null
+	private var currentListMode: ListMode? = null
 	private val spanSizeLookup = SpanSizeLookup()
 	open val isSwipeRefreshEnabled = true
 
@@ -150,6 +151,7 @@ abstract class MangaListFragment :
 		paginationListener = null
 		selectionController = null
 		spanResolver = null
+		currentListMode = null
 		spanSizeLookup.invalidateCache()
 		super.onDestroyView()
 	}
@@ -250,8 +252,13 @@ abstract class MangaListFragment :
 	}
 
 	private fun onListModeChanged(mode: ListMode) {
+		val recycler = requireViewBinding().recyclerView
+		if (currentListMode == mode && recycler.layoutManager != null) {
+			return
+		}
+		currentListMode = mode
 		spanSizeLookup.invalidateCache()
-		with(requireViewBinding().recyclerView) {
+		with(recycler) {
 			removeOnLayoutChangeListener(spanResolver)
 			when (mode) {
 				ListMode.LIST -> {
