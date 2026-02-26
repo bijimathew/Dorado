@@ -50,6 +50,12 @@ class MangaSourcesRepository @Inject constructor(
 	private val settings: AppSettings,
 ) {
 
+	data class ParserSourceSnapshot(
+		val source: MangaParserSource,
+		val isEnabled: Boolean,
+		val addedIn: Int,
+	)
+
 	private val isNewSourcesAssimilated = AtomicBoolean(false)
 	private val dao: MangaSourcesDao
 		get() = db.getSourcesDao()
@@ -125,26 +131,32 @@ class MangaSourcesRepository @Inject constructor(
 		query: String?,
 		locale: String?,
 		sortOrder: SourcesSortOrder?,
+		snapshot: List<ParserSourceSnapshot>? = null,
 	): List<MangaParserSource> {
-		assimilateNewSources()
+		val entries = snapshot ?: getParserSourcesSnapshot()
 		val coroutineContext = currentCoroutineContext()
-		val entities = dao.findAll().toMutableList()
-		coroutineContext.ensureActive()
+		val sources = entries.mapTo(ArrayList(entries.size)) { it.source }
 		val hideBrokenSources = settings.isBrokenSourcesHidden
+		if (settings.isNsfwContentDisabled) {
+			sources.removeAll { it.isNsfw() }
+		}
+		coroutineContext.ensureActive()
+		if (hideBrokenSources) {
+			sources.removeAll { it.isBroken }
+		}
+		coroutineContext.ensureActive()
 		if (isDisabledOnly && !settings.isAllSourcesEnabled) {
-			entities.removeAll { it.isEnabled }
+			val enabledSources = entries.asSequence()
+				.filter { it.isEnabled }
+				.mapTo(HashSet(entries.size)) { it.source }
+			sources.removeAll(enabledSources)
 		}
 		coroutineContext.ensureActive()
 		if (isNewOnly) {
-			entities.retainAll { it.addedIn == BuildConfig.VERSION_CODE }
-		}
-		coroutineContext.ensureActive()
-		val sources = entities.toSources(
-			skipNsfwSources = settings.isNsfwContentDisabled,
-			sortOrder = sortOrder,
-			hideBrokenSources = hideBrokenSources,
-		).run {
-			mapNotNullTo(ArrayList(size)) { it.mangaSource as? MangaParserSource }
+			val newSources = entries.asSequence()
+				.filter { it.addedIn == BuildConfig.VERSION_CODE }
+				.mapTo(HashSet(entries.size)) { it.source }
+			sources.retainAll(newSources)
 		}
 		coroutineContext.ensureActive()
 		if (locale != null) {
@@ -174,7 +186,25 @@ class MangaSourcesRepository @Inject constructor(
 				}
 			}
 		}
+		if (sortOrder == SourcesSortOrder.ALPHABETIC) {
+			sources.sortBy { it.getTitle(context) }
+		}
 		return sources
+	}
+
+	suspend fun getParserSourcesSnapshot(): List<ParserSourceSnapshot> {
+		assimilateNewSources()
+		return dao.findAll().mapNotNull { entity ->
+			val source = entity.source.toMangaSourceOrNull() ?: return@mapNotNull null
+			if (source !in allMangaSources) {
+				return@mapNotNull null
+			}
+			ParserSourceSnapshot(
+				source = source,
+				isEnabled = entity.isEnabled,
+				addedIn = entity.addedIn,
+			)
+		}
 	}
 
 	fun observeIsEnabled(source: MangaSource): Flow<Boolean> {

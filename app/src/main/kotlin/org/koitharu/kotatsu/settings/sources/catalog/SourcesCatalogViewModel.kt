@@ -2,7 +2,6 @@ package org.koitharu.kotatsu.settings.sources.catalog
 
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.viewModelScope
-import androidx.room.invalidationTrackerFlow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -61,14 +61,29 @@ class SourcesCatalogViewModel @Inject constructor(
 
 	val contentTypes = MutableStateFlow<List<ContentType>>(emptyList())
 
+	private val sourcesSnapshot = db.invalidationTracker.createFlow(
+		tables = arrayOf(TABLE_SOURCES),
+		emitInitialState = true,
+	).mapLatest {
+		repository.getParserSourcesSnapshot()
+	}.stateIn(
+		viewModelScope + Dispatchers.IO,
+		SharingStarted.Eagerly,
+		null,
+	)
+
 	val content: StateFlow<List<ListModel>> = combine(
 		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
 		appliedFilter.map { it }.distinctUntilChanged(),
-		db.invalidationTrackerFlow(TABLE_SOURCES),
-	) { q, f, _ ->
-		q to f
-	}.conflate().mapLatest { (q, f) ->
-		buildSourcesList(f, q)
+		sourcesSnapshot.filterNotNull(),
+	) { q, f, snapshot ->
+		Triple(q, f, snapshot)
+	}.conflate().mapLatest { (q, f, snapshot) ->
+		buildSourcesList(
+			filter = f,
+			query = q,
+			snapshot = snapshot,
+		)
 	}.distinctUntilChanged()
 		.stateIn(viewModelScope + Dispatchers.IO, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), listOf(LoadingState))
 
@@ -110,7 +125,11 @@ class SourcesCatalogViewModel @Inject constructor(
 		appliedFilter.value = appliedFilter.value.copy(isNewOnly = value)
 	}
 
-	private suspend fun buildSourcesList(filter: SourcesCatalogFilter, query: String?): List<SourceCatalogItem> {
+	private suspend fun buildSourcesList(
+		filter: SourcesCatalogFilter,
+		query: String?,
+		snapshot: List<MangaSourcesRepository.ParserSourceSnapshot>,
+	): List<SourceCatalogItem> {
 		val sources = repository.queryParserSources(
 			isDisabledOnly = true,
 			isNewOnly = filter.isNewOnly,
@@ -119,6 +138,7 @@ class SourcesCatalogViewModel @Inject constructor(
 			query = query,
 			locale = filter.locale,
 			sortOrder = SourcesSortOrder.ALPHABETIC,
+			snapshot = snapshot,
 		)
 		return if (sources.isEmpty()) {
 			listOf(

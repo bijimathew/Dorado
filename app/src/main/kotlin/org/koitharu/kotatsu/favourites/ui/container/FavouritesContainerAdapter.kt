@@ -6,13 +6,10 @@ import androidx.recyclerview.widget.AsyncDifferConfig
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.FlowCollector
-import org.koitharu.kotatsu.core.util.ContinuationResumeRunnable
+import org.koitharu.kotatsu.core.ui.ListDiffExecutor
 import org.koitharu.kotatsu.favourites.ui.list.FavouritesListFragment
 import org.koitharu.kotatsu.list.ui.ListModelDiffCallback
-import kotlin.coroutines.suspendCoroutine
 
 class FavouritesContainerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment),
 	FlowCollector<List<FavouriteTabModel>> {
@@ -20,7 +17,7 @@ class FavouritesContainerAdapter(fragment: Fragment) : FragmentStateAdapter(frag
 	private val differ = AsyncListDiffer(
 		AdapterListUpdateCallback(this),
 		AsyncDifferConfig.Builder(ListModelDiffCallback<FavouriteTabModel>())
-			.setBackgroundThreadExecutor(Dispatchers.Default.limitedParallelism(2).asExecutor())
+			.setBackgroundThreadExecutor(ListDiffExecutor.instance)
 			.build(),
 	)
 
@@ -39,8 +36,9 @@ class FavouritesContainerAdapter(fragment: Fragment) : FragmentStateAdapter(frag
 		return FavouritesListFragment.newInstance(item.id)
 	}
 
-	override suspend fun emit(value: List<FavouriteTabModel>) = suspendCoroutine { cont ->
-		differ.submitList(value, ContinuationResumeRunnable(cont))
+	override suspend fun emit(value: List<FavouriteTabModel>) {
+		// Keep collection non-blocking: submitList commit callbacks are not guaranteed.
+		differ.submitList(value)
 	}
 
 	fun getItem(position: Int): FavouriteTabModel = differ.currentList[position]
