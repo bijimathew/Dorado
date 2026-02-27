@@ -366,7 +366,7 @@ class PageLoader @Inject constructor(
 		private const val PREFETCH_LIMIT_DEFAULT = 6
 		private const val PREFETCH_MIN_RAM_MB = 80L
 		private const val INK_STORY_FRAGMENT_PREFIX = "ik=xor:"
-		private const val MANGA_OVH_SOURCE = "MANGA_OVH"
+		private val INK_STORY_SOURCES = setOf("MANGA_OVH", "MANGA_OVH_UPDATES")
 
 		fun createPageRequest(pageUrl: String, mangaSource: MangaSource) = Request.Builder()
 			.url(pageUrl)
@@ -377,7 +377,7 @@ class PageLoader @Inject constructor(
 			.build()
 
 		private fun extractInkStoryXorKey(pageUrl: String, mangaSource: MangaSource): ByteArray? {
-			if (mangaSource.name != MANGA_OVH_SOURCE) {
+			if (mangaSource.name !in INK_STORY_SOURCES) {
 				return null
 			}
 			val url = pageUrl.toHttpUrlOrNull() ?: return null
@@ -399,7 +399,7 @@ class PageLoader @Inject constructor(
 		}
 
 		private fun shouldValidateInkStoryCache(pageUrl: String, mangaSource: MangaSource): Boolean {
-			if (mangaSource.name != MANGA_OVH_SOURCE) {
+			if (mangaSource.name !in INK_STORY_SOURCES) {
 				return false
 			}
 			val url = pageUrl.toHttpUrlOrNull() ?: return false

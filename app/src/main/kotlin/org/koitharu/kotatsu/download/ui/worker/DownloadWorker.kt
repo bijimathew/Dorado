@@ -38,6 +38,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.internal.closeQuietly
 import okio.IOException
 import okio.buffer
@@ -65,6 +66,7 @@ import org.koitharu.kotatsu.core.util.ext.ensureSuccess
 import org.koitharu.kotatsu.core.util.ext.getDisplayMessage
 import org.koitharu.kotatsu.core.util.ext.getWorkInputData
 import org.koitharu.kotatsu.core.util.ext.getWorkSpec
+import org.koitharu.kotatsu.core.util.ext.isImage
 import org.koitharu.kotatsu.core.util.ext.openSource
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toFileOrNull
@@ -365,9 +367,12 @@ class DownloadWorker @AssistedInject constructor(
 	}
 
 	private suspend fun getMediaType(url: String, file: File): MimeType? = runInterruptible(Dispatchers.IO) {
-		BitmapDecoderCompat.probeMimeType(file)?.let {
-			return@runInterruptible it
+		BitmapDecoderCompat.probeMimeType(file)?.let { mimeType ->
+			if (mimeType.isImage || mimeType.toString() != "application/octet-stream") {
+				return@runInterruptible mimeType
+			}
 		}
+		detectImageMimeType(file)?.let { return@runInterruptible it }
 		MimeTypes.getMimeTypeFromUrl(url)
 	}
 
@@ -405,11 +410,25 @@ class DownloadWorker @AssistedInject constructor(
 				var file: File? = null
 				try {
 					response.requireBody().use { body ->
-						file = destination.createTempFile(
-							ext = MimeTypes.getExtension(body.contentType()?.toMimeType())
-						).also { tempFiles += it }
-						file.sink(append = false).buffer().use {
-							it.writeAllCancellable(body.source())
+						val responseMimeType = body.contentType()?.toMimeType()
+						val inkStoryXorKey = extractInkStoryXorKey(url, source)
+						if (inkStoryXorKey != null) {
+							val decodedBytes = decodeInkStoryXor(body.bytes(), inkStoryXorKey)
+							val decodedMimeType = detectImageMimeType(decodedBytes)
+								?: responseMimeType?.takeIf { it.isImage }
+							file = destination.createTempFile(
+								ext = MimeTypes.getExtension(decodedMimeType),
+							).also { tempFiles += it }
+							file.sink(append = false).buffer().use {
+								it.write(decodedBytes)
+							}
+						} else {
+							file = destination.createTempFile(
+								ext = MimeTypes.getExtension(responseMimeType)
+							).also { tempFiles += it }
+							file.sink(append = false).buffer().use {
+								it.writeAllCancellable(body.source())
+							}
 						}
 					}
 				} catch (e: Exception) {
@@ -586,6 +605,101 @@ class DownloadWorker @AssistedInject constructor(
 	}
 
 	private companion object {
+
+		private const val INK_STORY_FRAGMENT_PREFIX = "ik=xor:"
+		private val INK_STORY_SOURCES = setOf("MANGA_OVH", "MANGA_OVH_UPDATES")
+
+		private fun extractInkStoryXorKey(pageUrl: String, mangaSource: MangaSource): ByteArray? {
+			if (mangaSource.name !in INK_STORY_SOURCES) {
+				return null
+			}
+			val url = pageUrl.toHttpUrlOrNull() ?: return null
+			if (!url.host.endsWith("inuko.me") || !url.encodedPath.contains("/chapters/")) {
+				return null
+			}
+			val imageName = url.pathSegments.lastOrNull()
+				?.substringBeforeLast('.', "")
+				.orEmpty()
+			if (imageName.length != 36 || imageName.getOrNull(14) != 'x') {
+				return null
+			}
+			val fragment = url.fragment ?: return null
+			if (!fragment.startsWith(INK_STORY_FRAGMENT_PREFIX)) {
+				return null
+			}
+			val key = fragment.removePrefix(INK_STORY_FRAGMENT_PREFIX)
+			return key.takeIf { it.isNotBlank() }?.toByteArray()
+		}
+
+		private fun decodeInkStoryXor(source: ByteArray, key: ByteArray): ByteArray {
+			if (key.isEmpty()) {
+				return source
+			}
+			val result = ByteArray(source.size)
+			for (i in source.indices) {
+				result[i] = (source[i].toInt() xor key[i % key.size].toInt()).toByte()
+			}
+			return result
+		}
+
+		private fun detectImageMimeType(file: File): MimeType? {
+			if (!file.isFile || file.length() <= 0L) {
+				return null
+			}
+			val header = ByteArray(12)
+			val size = file.inputStream().use { input ->
+				input.read(header)
+			}
+			if (size <= 0) {
+				return null
+			}
+			return detectImageMimeType(header.copyOf(size))
+		}
+
+		private fun detectImageMimeType(bytes: ByteArray): MimeType? {
+			if (bytes.size >= 12
+				&& bytes[0] == 'R'.code.toByte()
+				&& bytes[1] == 'I'.code.toByte()
+				&& bytes[2] == 'F'.code.toByte()
+				&& bytes[3] == 'F'.code.toByte()
+				&& bytes[8] == 'W'.code.toByte()
+				&& bytes[9] == 'E'.code.toByte()
+				&& bytes[10] == 'B'.code.toByte()
+				&& bytes[11] == 'P'.code.toByte()
+			) {
+				return MimeType("image/webp")
+			}
+			if (bytes.size >= 3
+				&& bytes[0] == 0xff.toByte()
+				&& bytes[1] == 0xd8.toByte()
+				&& bytes[2] == 0xff.toByte()
+			) {
+				return MimeType("image/jpeg")
+			}
+			if (bytes.size >= 8
+				&& bytes[0] == 0x89.toByte()
+				&& bytes[1] == 0x50.toByte()
+				&& bytes[2] == 0x4e.toByte()
+				&& bytes[3] == 0x47.toByte()
+				&& bytes[4] == 0x0d.toByte()
+				&& bytes[5] == 0x0a.toByte()
+				&& bytes[6] == 0x1a.toByte()
+				&& bytes[7] == 0x0a.toByte()
+			) {
+				return MimeType("image/png")
+			}
+			if (bytes.size >= 6
+				&& bytes[0] == 'G'.code.toByte()
+				&& bytes[1] == 'I'.code.toByte()
+				&& bytes[2] == 'F'.code.toByte()
+				&& bytes[3] == '8'.code.toByte()
+				&& (bytes[4] == '7'.code.toByte() || bytes[4] == '9'.code.toByte())
+				&& bytes[5] == 'a'.code.toByte()
+			) {
+				return MimeType("image/gif")
+			}
+			return null
+		}
 
 		const val MAX_FAILSAFE_ATTEMPTS = 2
 		const val MAX_PAGES_PARALLELISM = 4
