@@ -25,25 +25,17 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 		readerAdapter = onCreateAdapter()
 
 		viewModel.content.observe(viewLifecycleOwner) {
-			// Determine which state to use for restoring position:
-			// - content.state: explicitly set state (e.g., after mode switch or chapter change)
-			// - getCurrentState(): current reading position saved in SavedStateHandle
 			val currentState = viewModel.getCurrentState()
 			val pendingState = when {
-				// If content.state is null and we have pages, use getCurrentState
+				readerAdapter?.hasItems == true -> null
 				it.state == null
-					&& it.pages.isNotEmpty()
-					&& readerAdapter?.hasItems != true -> currentState
-
-				// use currentState only if it matches the current pages (to avoid the error message)
-				readerAdapter?.hasItems != true
-					&& it.state != currentState
+					&& it.pages.isNotEmpty() -> currentState
+				it.state != currentState
 					&& currentState != null
 					&& it.pages.any { page -> page.chapterId == currentState.chapterId } -> currentState
-
-				// Otherwise, use content.state (normal flow, mode switch, chapter change)
 				else -> it.state
 			}
+			android.util.Log.d("WS", "BaseFragment observer: hasItems=${readerAdapter?.hasItems} contentState=${it.state} currentState=$currentState pendingState=$pendingState pageCount=${it.pages.size}")
 			onPagesChanged(it.pages, pendingState)
 		}
 	}
@@ -52,7 +44,9 @@ abstract class BaseReaderFragment<B : ViewBinding> : BaseFragment<B>(), ZoomCont
 
 	override fun onPause() {
 		super.onPause()
-		viewModel.saveCurrentState(getCurrentState())
+		val state = getCurrentState()
+		android.util.Log.d("WS", "onPause: saving state=$state")
+		viewModel.saveCurrentState(state)
 	}
 
 	override fun onDestroyView() {

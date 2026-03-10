@@ -110,6 +110,8 @@ class ReaderViewModel @Inject constructor(
     private var pageSaveJob: Job? = null
     private var bookmarkJob: Job? = null
     private var stateChangeJob: Job? = null
+    private var lastScrollProgress: Float = -1f
+    private var lastScrollOffset: Int = 0
 
     init {
         mangaDetails.value = intent.manga?.let { MangaDetails(it) }
@@ -244,6 +246,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun saveCurrentState(state: ReaderState? = null) {
+        stateChangeJob?.cancel()
         if (state != null) {
             readingState.value = state
             savedStateHandle[ReaderIntent.EXTRA_STATE] = state
@@ -333,7 +336,25 @@ class ReaderViewModel @Inject constructor(
     }
 
     @MainThread
-    fun onCurrentPageChanged(lowerPos: Int, upperPos: Int) {
+    fun updateScrollProgress(progress: Float) {
+        lastScrollProgress = progress
+        uiState.value?.let { current ->
+            uiState.value = current.copy(scrollProgress = progress)
+        }
+    }
+
+    @MainThread
+    fun updateScrollOffset(offset: Int) {
+        lastScrollOffset = offset
+        readingState.update { cs ->
+            cs?.copy(scroll = offset)
+        }
+    }
+
+    @MainThread
+    fun onCurrentPageChanged(lowerPos: Int, upperPos: Int, scrollProgress: Float = -1f, scrollOffset: Int = 0) {
+        lastScrollProgress = scrollProgress
+        val capturedScrollOffset = scrollOffset
         val prevJob = stateChangeJob
         val pages = content.value.pages // capture immediately
         stateChangeJob = launchJob(Dispatchers.Default) {
@@ -345,7 +366,7 @@ class ReaderViewModel @Inject constructor(
             val centerPos = (lowerPos + upperPos) / 2
             pages.getOrNull(centerPos)?.let { page ->
                 readingState.update { cs ->
-                    cs?.copy(chapterId = page.chapterId, page = page.index)
+                    cs?.copy(chapterId = page.chapterId, page = page.index, scroll = capturedScrollOffset)
                 }
             }
             notifyStateChanged()
@@ -520,6 +541,7 @@ class ReaderViewModel @Inject constructor(
             currentPage = state.page,
             percent = computePercent(state.chapterId, state.page),
             incognito = isIncognitoMode.value == true,
+            scrollProgress = lastScrollProgress,
         )
         uiState.value = newState
         if (isIncognitoMode.value == false) {

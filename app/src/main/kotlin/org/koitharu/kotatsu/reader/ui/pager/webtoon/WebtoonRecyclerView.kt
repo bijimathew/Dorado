@@ -211,12 +211,10 @@ class WebtoonRecyclerView @JvmOverloads constructor(
 			}
 			val newFirstPos = lm.findFirstVisibleItemPosition()
 			val newLastPos = lm.findLastVisibleItemPosition()
-			if (newFirstPos != firstPos || newLastPos != lastPos) {
-				firstPos = newFirstPos
-				lastPos = newLastPos
-				if (newFirstPos != NO_POSITION && newLastPos != NO_POSITION) {
-					rv.onPageScrollListeners.forEach { it.onScrollChanged(rv, dy, newFirstPos, newLastPos) }
-				}
+			firstPos = newFirstPos
+			lastPos = newLastPos
+			if (newFirstPos != NO_POSITION && newLastPos != NO_POSITION) {
+				rv.onPageScrollListeners.forEach { it.onScrollChanged(rv, dy, newFirstPos, newLastPos) }
 			}
 		}
 	}

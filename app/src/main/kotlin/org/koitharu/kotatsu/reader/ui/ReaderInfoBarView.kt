@@ -237,16 +237,23 @@ class ReaderInfoBarView @JvmOverloads constructor(
 	@SuppressLint("StringFormatMatches")
 	fun update(state: ReaderUiState?) {
 		text = if (state != null) {
-			context.getString(
-				R.string.reader_info_pattern,
-				state.chapterNumber,
-				state.chaptersTotal,
-				state.currentPage + 1,
-				state.totalPages,
-			) + if (state.percent in 0f..1f) {
-				"     " + context.getString(R.string.percent_string_pattern, (state.percent * 100).format())
-			} else {
-				""
+			buildString {
+				append(context.getString(
+					R.string.reader_info_pattern,
+					state.chapterNumber,
+					state.chaptersTotal,
+					state.currentPage + 1,
+					state.totalPages,
+				))
+				if (state.percent in 0f..1f) {
+					append("     ")
+					append(context.getString(R.string.percent_string_pattern, (state.percent * 100).format()))
+				}
+				if (state.scrollProgress in 0f..1f) {
+					append("  ↕")
+					append((state.scrollProgress * 100).toInt())
+					append('%')
+				}
 			}
 		} else {
 			""

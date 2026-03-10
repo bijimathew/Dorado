@@ -48,6 +48,8 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 	private var recyclerLifecycleDispatcher: RecyclerViewLifecycleDispatcher? = null
 	private var canGoPrev = true
 	private var canGoNext = true
+	private var lastFirstPos = RecyclerView.NO_POSITION
+	private var lastLastPos = RecyclerView.NO_POSITION
 
 	override fun onCreateViewBinding(
 		inflater: LayoutInflater,
@@ -128,10 +130,30 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		firstVisiblePosition: Int,
 		lastVisiblePosition: Int,
 	) {
-		viewModel.onCurrentPageChanged(firstVisiblePosition, lastVisiblePosition)
+		// Update progress from first visible holder (for continuous display)
+		val lm = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+		val firstPos = lm?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+		val firstHolder = if (firstPos != RecyclerView.NO_POSITION) {
+			recyclerView.findViewHolderForAdapterPosition(firstPos) as? WebtoonHolder
+		} else null
+		val progress = firstHolder?.getScrollProgress() ?: -1f
+		viewModel.updateScrollProgress(progress)
+		viewModel.updateScrollOffset(if (progress >= 0f) (progress * 10000).toInt() else 0)
+		// Only notify page change when visible positions actually change
+		if (firstVisiblePosition != lastFirstPos || lastVisiblePosition != lastLastPos) {
+			lastFirstPos = firstVisiblePosition
+			lastLastPos = lastVisiblePosition
+			// Compute scroll from centerPos holder (matches what ViewModel uses for chapterId/page)
+			val centerPos = (firstVisiblePosition + lastVisiblePosition) / 2
+			val centerHolder = recyclerView.findViewHolderForAdapterPosition(centerPos) as? WebtoonHolder
+			val centerProgress = centerHolder?.getScrollProgress() ?: 0f
+			val scrollPercent = if (centerProgress >= 0f) (centerProgress * 10000).toInt() else 0
+			viewModel.onCurrentPageChanged(firstVisiblePosition, lastVisiblePosition, progress, scrollPercent)
+		}
 	}
 
 	override suspend fun onPagesChanged(pages: List<ReaderPage>, pendingState: ReaderState?) = coroutineScope {
+		android.util.Log.d("WS", "onPagesChanged pageCount=${pages.size} pendingState=$pendingState hasItems=${readerAdapter?.hasItems}")
 		val setItems = launch {
 			requireAdapter().setItems(pages)
 			yield()
@@ -145,12 +167,10 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 			}
 			setItems.join()
 			if (position != -1) {
+				android.util.Log.d("WS", "onPagesChanged: restoring position=$position scroll=${pendingState.scroll}")
 				with(requireViewBinding().recyclerView) {
 					firstVisibleItemPosition = position
-					post {
-						(findViewHolderForAdapterPosition(position) as? WebtoonHolder)
-							?.restoreScroll(pendingState.scroll)
-					}
+					postRestoreScroll(this, position, pendingState.scroll)
 				}
 				viewModel.onCurrentPageChanged(position, position)
 			} else {
@@ -163,14 +183,34 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 	}
 
 	override fun getCurrentState(): ReaderState? = viewBinding?.run {
-		val currentItem = recyclerView.findCurrentPagePosition()
+		val lm = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+			?: return@run null
+		val currentItem = lm.findFirstVisibleItemPosition()
+		if (currentItem == RecyclerView.NO_POSITION) return@run null
 		val adapter = recyclerView.adapter as? BaseReaderAdapter<*>
 		val page = adapter?.getItemOrNull(currentItem) ?: return@run null
+		val holder = recyclerView.findViewHolderForAdapterPosition(currentItem) as? WebtoonHolder
+		val progress = holder?.getScrollProgress() ?: 0f
+		android.util.Log.d("WS", "getCurrentState item=$currentItem chapterId=${page.chapterId} page=${page.index} progress=$progress scroll=${(progress * 10000).toInt()}")
 		ReaderState(
 			chapterId = page.chapterId,
 			page = page.index,
-			scroll = (recyclerView.findViewHolderForAdapterPosition(currentItem) as? WebtoonHolder)?.getScrollY() ?: 0,
+			scroll = (progress * 10000).toInt(),
 		)
+	}
+
+	private fun postRestoreScroll(rv: RecyclerView, position: Int, scrollPercent: Int) {
+		rv.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
+			override fun onChildViewAttachedToWindow(view: android.view.View) {
+				val holder = rv.getChildViewHolder(view) as? WebtoonHolder
+				if (holder != null && holder.bindingAdapterPosition == position) {
+					rv.removeOnChildAttachStateChangeListener(this)
+					android.util.Log.d("WS", "postRestoreScroll: holder attached at pos=$position, restoring scroll=$scrollPercent")
+					holder.restoreScrollPercent(scrollPercent)
+				}
+			}
+			override fun onChildViewDetachedFromWindow(view: android.view.View) {}
+		})
 	}
 
 	override fun onZoomIn() {

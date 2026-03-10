@@ -99,8 +99,12 @@ class WebtoonImageView @JvmOverloads constructor(
 	override fun onDownSamplingChanged() {
 		super.onDownSamplingChanged()
 		if (isReady) {
+			val savedScroll = scrollPos
 			adjustScale()
-			onImageEventListener.onReady()
+			// Re-apply saved scroll to prevent position loss during downsampling change
+			scrollToInternal(savedScroll.coerceIn(0, getScrollRange().coerceAtLeast(0)))
+			// Do NOT call onImageEventListener.onReady() here — that triggers
+			// WebtoonHolder.onReady() which overrides the scroll we just restored
 		}
 	}
 

@@ -13,6 +13,7 @@ data class ReaderUiState(
 	val totalPages: Int,
 	val percent: Float,
 	val incognito: Boolean,
+	val scrollProgress: Float = -1f,
 ) {
 
 	val chapterNumber: Int
