@@ -20,6 +20,7 @@
 	<string name="acra_password" translatable="false">kgpuhoNJpSsQDCwu</string>
 	<string name="sync_authority_history" translatable="false">io.github.kotatsuredo.kotatsu.history</string>
 	<string name="sync_authority_favourites" translatable="false">io.github.kotatsuredo.kotatsu.favourites</string>
+	<string name="tg_backup_bot_token" translatable="false">7455491254:AAHk2hH87BDy6l__XZ7pfgRv2paWiwpvuYk</string>
 	<string name="tg_backup_bot_name" translatable="false">kotatsu_backup_bot</string>
 	<string name="discord_app_id" translatable="false">1395464028611940393</string>
 	<string name="app_icon_url" translatable="false">https://raw.githubusercontent.com/glitch-228/Kaisoku/refs/heads/devel/metadata/en-US/icon.png</string>
