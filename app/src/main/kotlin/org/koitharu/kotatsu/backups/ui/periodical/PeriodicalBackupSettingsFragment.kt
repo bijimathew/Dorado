@@ -1,9 +1,11 @@
 package org.koitharu.kotatsu.backups.ui.periodical
 
+import android.content.SharedPreferences
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils
+import android.view.inputmethod.EditorInfo
 import android.view.View
 import androidx.activity.result.ActivityResultCallback
 import androidx.fragment.app.viewModels
@@ -21,13 +23,16 @@ import org.koitharu.kotatsu.core.ui.BasePreferenceFragment
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
 import org.koitharu.kotatsu.core.util.ext.tryLaunch
+import org.koitharu.kotatsu.settings.utils.EditTextBindListener
 import org.koitharu.kotatsu.settings.utils.EditTextFallbackSummaryProvider
+import org.koitharu.kotatsu.settings.utils.PasswordSummaryProvider
 import java.util.Date
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodic_backups),
-	ActivityResultCallback<Uri?> {
+	ActivityResultCallback<Uri?>,
+	SharedPreferences.OnSharedPreferenceChangeListener {
 
 	@Inject
 	lateinit var telegramBackupUploader: TelegramBackupUploader
@@ -38,19 +43,43 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_backup_periodic)
-		findPreference<PreferenceCategory>(AppSettings.KEY_BACKUP_TG)?.isVisible = viewModel.isTelegramAvailable
+		findPreference<PreferenceCategory>(AppSettings.KEY_BACKUP_TG)?.isVisible = true
+		findPreference<EditTextPreference>(AppSettings.KEY_BACKUP_TG_TOKEN)?.let { pref ->
+			@Suppress("UsePropertyAccessSyntax")
+			pref.setOnBindEditTextListener(
+				EditTextBindListener(
+					inputType = EditorInfo.TYPE_CLASS_TEXT or EditorInfo.TYPE_TEXT_VARIATION_PASSWORD,
+					hint = null,
+					validator = null,
+				),
+			)
+			pref.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
+				if (preference.text.isNullOrBlank()) {
+					getString(R.string.telegram_bot_token_summary)
+				} else {
+					PasswordSummaryProvider().provideSummary(preference)
+				}
+			}
+		}
 		findPreference<EditTextPreference>(AppSettings.KEY_BACKUP_TG_CHAT)?.summaryProvider =
 			EditTextFallbackSummaryProvider(R.string.telegram_chat_id_summary)
+		updateTelegramPreferences()
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
+		settings.subscribe(this)
 		viewModel.lastBackupDate.observe(viewLifecycleOwner, ::bindLastBackupInfo)
 		viewModel.backupsDirectory.observe(viewLifecycleOwner, ::bindOutputSummary)
 		viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(listView, this))
 		viewModel.isTelegramCheckLoading.observe(viewLifecycleOwner) {
-			findPreference<Preference>(AppSettings.KEY_BACKUP_TG_TEST)?.isEnabled = !it
+			updateTelegramPreferences()
 		}
+	}
+
+	override fun onDestroyView() {
+		settings.unsubscribe(this)
+		super.onDestroyView()
 	}
 
 	override fun onPreferenceTreeClick(preference: Preference): Boolean {
@@ -79,6 +108,16 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 		}
 	}
 
+	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+		when (key) {
+			AppSettings.KEY_BACKUP_TG_TOKEN,
+			AppSettings.KEY_BACKUP_TG_ENABLED,
+			AppSettings.KEY_BACKUP_TG_CHAT,
+			AppSettings.KEY_BACKUP_PERIODICAL_ENABLED,
+			-> updateTelegramPreferences()
+		}
+	}
+
 	private fun bindOutputSummary(path: String?) {
 		val preference = findPreference<Preference>(AppSettings.KEY_BACKUP_PERIODICAL_OUTPUT) ?: return
 		preference.summary = when (path) {
@@ -103,5 +142,10 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 		}
 		preference.isVisible = lastBackupDate != null
 	}
-}
 
+	private fun updateTelegramPreferences() {
+		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_OPEN)?.isVisible = settings.backupTelegramBotToken == null
+		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_TEST)?.isVisible = viewModel.isTelegramAvailable
+		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_TEST)?.isEnabled = !viewModel.isTelegramCheckLoading.value
+	}
+}

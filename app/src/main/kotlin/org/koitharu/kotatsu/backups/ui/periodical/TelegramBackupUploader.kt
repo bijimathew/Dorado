@@ -28,10 +28,10 @@ class TelegramBackupUploader @Inject constructor(
 	@ApplicationContext private val context: Context,
 ) {
 
-	private val botToken = context.getString(R.string.tg_backup_bot_token)
+	private val defaultBotToken = context.getString(R.string.tg_backup_bot_token).trim()
 
 	val isAvailable: Boolean
-		get() = botToken.isNotEmpty()
+		get() = resolveBotToken() != null
 
 	suspend fun uploadBackup(file: File) {
 		val requestBody = file.asRequestBody("application/zip".toMediaTypeOrNull())
@@ -77,6 +77,10 @@ class TelegramBackupUploader @Inject constructor(
 		"Telegram chat ID not set in settings"
 	}
 
+	private fun requireBotToken() = checkNotNull(resolveBotToken()) {
+		"Telegram bot token not set"
+	}
+
 	private fun Response.consume() {
 		if (isSuccessful) {
 			closeQuietly()
@@ -91,6 +95,8 @@ class TelegramBackupUploader @Inject constructor(
 	private fun urlOf(method: String) = HttpUrl.Builder()
 		.scheme("https")
 		.host("api.telegram.org")
-		.addPathSegment("bot$botToken")
+		.addPathSegment("bot${requireBotToken()}")
 		.addPathSegment(method)
+
+	private fun resolveBotToken(): String? = settings.backupTelegramBotToken ?: defaultBotToken.ifBlank { null }
 }

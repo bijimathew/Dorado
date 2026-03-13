@@ -28,8 +28,8 @@ android {
 		applicationId 'io.github.kotatsuredo.kotatsu'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 2023
-		versionName = '9.6.6-3'
+		versionCode = 2024
+		versionName = '9.6.6-4'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -44,7 +44,10 @@ android {
 		if (localPropertiesFile.exists()) {
 			localProperties.load(new FileInputStream(localPropertiesFile))
 		}
-		resValue 'string', 'tg_backup_bot_token', localProperties.getProperty('tg_backup_bot_token', '')
+		def telegramBackupBotToken = localProperties.getProperty('tg_backup_bot_token')
+		if (telegramBackupBotToken != null && !telegramBackupBotToken.isBlank()) {
+			resValue 'string', 'tg_backup_bot_token', telegramBackupBotToken
+		}
 	}
 	buildTypes {
 		debug {

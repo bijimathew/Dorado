@@ -575,6 +575,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val backupTelegramChatId: String?
 		get() = prefs.getString(KEY_BACKUP_TG_CHAT, null)?.nullIfEmpty()
 
+	val backupTelegramBotToken: String?
+		get() = prefs.getString(KEY_BACKUP_TG_TOKEN, null)?.trim()?.nullIfEmpty()
+
 	val isReadingTimeEstimationEnabled: Boolean
 		get() = prefs.getBoolean(KEY_READING_TIME, true)
 
@@ -816,6 +819,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_COLLAPSE_DESCRIPTION = "description_collapse"
 		const val KEY_BACKUP_TG_ENABLED = "backup_periodic_tg_enabled"
 		const val KEY_BACKUP_TG_CHAT = "backup_periodic_tg_chat_id"
+		const val KEY_BACKUP_TG_TOKEN = "backup_periodic_tg_bot_token"
 		const val KEY_MANGA_LIST_BADGES = "manga_list_badges"
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
