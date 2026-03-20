@@ -28,6 +28,7 @@ import java.nio.ByteBuffer
 object BitmapDecoderCompat {
 
 	private const val FORMAT_AVIF = "avif"
+	private const val MIME_HEADER_SIZE = 32
 
 	@Blocking
 	fun decode(file: File): Bitmap = when (val format = probeMimeType(file)?.subtype) {
@@ -73,7 +74,24 @@ object BitmapDecoderCompat {
 
 	@Blocking
 	fun probeMimeType(file: File): MimeType? {
-		return MimeTypes.probeMimeType(file) ?: detectBitmapType(file)
+		return detectBitmapType(file) ?: MimeTypes.probeMimeType(file)
+	}
+
+	@Blocking
+	fun probeMimeType(stream: InputStream, fallback: MimeType? = null): MimeType? {
+		val bufferedStream = if (stream.markSupported()) stream else stream.buffered(MIME_HEADER_SIZE)
+		bufferedStream.mark(MIME_HEADER_SIZE)
+		return try {
+			val header = ByteArray(MIME_HEADER_SIZE)
+			val size = bufferedStream.read(header)
+			if (size <= 0) {
+				fallback
+			} else {
+				detectBitmapType(header.copyOf(size)) ?: fallback
+			}
+		} finally {
+			bufferedStream.reset()
+		}
 	}
 
 	@Blocking
@@ -87,6 +105,51 @@ object BitmapDecoderCompat {
 
 	private fun checkBitmapNotNull(bitmap: Bitmap?, format: String?): Bitmap =
 		bitmap ?: throw ImageDecodeException(null, format)
+
+	private fun detectBitmapType(bytes: ByteArray): MimeType? {
+		if (bytes.size >= 12
+			&& bytes[0] == 'R'.code.toByte()
+			&& bytes[1] == 'I'.code.toByte()
+			&& bytes[2] == 'F'.code.toByte()
+			&& bytes[3] == 'F'.code.toByte()
+			&& bytes[8] == 'W'.code.toByte()
+			&& bytes[9] == 'E'.code.toByte()
+			&& bytes[10] == 'B'.code.toByte()
+			&& bytes[11] == 'P'.code.toByte()
+		) {
+			return MimeType("image/webp")
+		}
+		if (bytes.size >= 3
+			&& bytes[0] == 0xff.toByte()
+			&& bytes[1] == 0xd8.toByte()
+			&& bytes[2] == 0xff.toByte()
+		) {
+			return MimeType("image/jpeg")
+		}
+		if (bytes.size >= 8
+			&& bytes[0] == 0x89.toByte()
+			&& bytes[1] == 0x50.toByte()
+			&& bytes[2] == 0x4e.toByte()
+			&& bytes[3] == 0x47.toByte()
+			&& bytes[4] == 0x0d.toByte()
+			&& bytes[5] == 0x0a.toByte()
+			&& bytes[6] == 0x1a.toByte()
+			&& bytes[7] == 0x0a.toByte()
+		) {
+			return MimeType("image/png")
+		}
+		if (bytes.size >= 6
+			&& bytes[0] == 'G'.code.toByte()
+			&& bytes[1] == 'I'.code.toByte()
+			&& bytes[2] == 'F'.code.toByte()
+			&& bytes[3] == '8'.code.toByte()
+			&& (bytes[4] == '7'.code.toByte() || bytes[4] == '9'.code.toByte())
+			&& bytes[5] == 'a'.code.toByte()
+		) {
+			return MimeType("image/gif")
+		}
+		return null
+	}
 
 	private fun decodeAvif(bytes: ByteBuffer): Bitmap {
 		val info = Info()

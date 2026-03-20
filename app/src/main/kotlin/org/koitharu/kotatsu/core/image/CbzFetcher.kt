@@ -10,6 +10,7 @@ import coil3.request.Options
 import coil3.toAndroidUri
 import kotlinx.coroutines.runInterruptible
 import okio.Path.Companion.toPath
+import okio.buffer
 import okio.openZip
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.isZipUri
@@ -23,10 +24,14 @@ class CbzFetcher(
 	override suspend fun fetch() = runInterruptible {
 		val filePath = uri.schemeSpecificPart.toPath()
 		val entryName = requireNotNull(uri.fragment)
+		val entryPath = entryName.toPath()
 		val fs = options.fileSystem.openZip(filePath)
+		val mimeType = fs.source(entryPath).buffer().inputStream().use { input ->
+			BitmapDecoderCompat.probeMimeType(input, MimeTypes.getMimeTypeFromExtension(entryName))
+		}
 		SourceFetchResult(
-			source = ImageSource(entryName.toPath(), fs),
-			mimeType = MimeTypes.getMimeTypeFromExtension(entryName)?.toString(),
+			source = ImageSource(entryPath, fs),
+			mimeType = mimeType?.toString(),
 			dataSource = DataSource.DISK,
 		)
 	}

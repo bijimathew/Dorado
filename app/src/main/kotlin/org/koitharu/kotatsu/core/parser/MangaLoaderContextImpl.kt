@@ -87,7 +87,7 @@ class MangaLoaderContextImpl @Inject constructor(
                     (redraw(BitmapWrapper.create(bitmap)) as BitmapWrapper).use { result ->
                         Buffer().also {
                             result.compressTo(it.outputStream())
-                        }.asResponseBody("image/jpeg".toMediaType())
+                        }.asResponseBody("image/png".toMediaType())
                     }
                 }
         }

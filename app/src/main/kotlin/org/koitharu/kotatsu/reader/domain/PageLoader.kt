@@ -196,8 +196,14 @@ class PageLoader @Inject constructor(
 				ZipFile(uri.schemeSpecificPart).use { zip ->
 					val entry = zip.getEntry(uri.fragment)
 					context.ensureRamAtLeast(entry.size * 2)
-					zip.getInputStream(entry).use {
-						BitmapDecoderCompat.decode(it, MimeTypes.getMimeTypeFromExtension(entry.name))
+					zip.getInputStream(entry).buffered().use { input ->
+						BitmapDecoderCompat.decode(
+							input,
+							BitmapDecoderCompat.probeMimeType(
+								stream = input,
+								fallback = MimeTypes.getMimeTypeFromExtension(entry.name),
+							),
+						)
 					}
 				}
 			}.use { image ->
