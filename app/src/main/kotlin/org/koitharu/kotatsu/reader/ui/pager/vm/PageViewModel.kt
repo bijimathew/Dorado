@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.annotation.WorkerThread
 import com.davemorrissey.labs.subscaleview.DefaultOnImageEventListener
 import com.davemorrissey.labs.subscaleview.ImageSource
+import com.davemorrissey.labs.subscaleview.decoder.ImageDecodeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +96,7 @@ class PageViewModel(
 		state.update { currentState ->
 			if (currentState is PageState.Loaded) {
 				val uri = (currentState.source as? ImageSource.Uri)?.uri
-				if (!currentState.isConverted && uri != null && e is IOException) {
+				if (!currentState.isConverted && uri != null && (e is IOException || e is ImageDecodeException)) {
 					tryConvert(uri, e)
 					PageState.Converting()
 				} else {

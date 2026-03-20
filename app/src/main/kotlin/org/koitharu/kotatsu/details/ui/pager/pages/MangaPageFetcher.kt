@@ -18,6 +18,7 @@ import okhttp3.Response
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import org.koitharu.kotatsu.core.network.MangaHttpClient
+import org.koitharu.kotatsu.core.image.BitmapDecoderCompat
 import org.koitharu.kotatsu.core.network.imageproxy.ImageProxyInterceptor
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.MimeTypes
@@ -55,9 +56,11 @@ class MangaPageFetcher(
 		val pageUrl = repo.getPageUrl(page)
 		if (options.diskCachePolicy.readEnabled) {
 			pagesCache[pageUrl]?.let { file ->
+				val mimeType = BitmapDecoderCompat.probeMimeType(file)
+					?: MimeTypes.getMimeTypeFromExtension(file.name)
 				return SourceFetchResult(
 					source = ImageSource(file.toOkioPath(), options.fileSystem),
-					mimeType = MimeTypes.getMimeTypeFromExtension(file.name)?.toString(),
+					mimeType = mimeType?.toString(),
 					dataSource = DataSource.DISK,
 				)
 			}
