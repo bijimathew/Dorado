@@ -24,6 +24,7 @@ import coil3.size.Size
 import coil3.size.isOriginal
 import coil3.size.pxOrElse
 import org.koitharu.kotatsu.core.util.ext.copyWithNewSource
+import org.koitharu.kotatsu.core.util.ext.toMimeTypeOrNull
 import kotlin.math.roundToInt
 
 class RegionBitmapDecoder(
@@ -35,35 +36,38 @@ class RegionBitmapDecoder(
 	override suspend fun decode(): DecodeResult? {
 		val regionDecoder = BitmapDecoderCompat.createRegionDecoder(fetchResult.source.source().inputStream())
 		if (regionDecoder == null) {
-			val revivedFetchResult = fetchResult.copyWithNewSource()
-			return try {
-				val fallbackDecoder = imageLoader.components.newDecoder(
-					result = revivedFetchResult,
-					options = options,
-					imageLoader = imageLoader,
-					startIndex = 0,
-				)?.first
-				if (fallbackDecoder == null || fallbackDecoder is RegionBitmapDecoder) {
-					null
-				} else {
-					fallbackDecoder.decode()
-				}
-			} finally {
-				revivedFetchResult.source.close()
-			}
+			return decodeFullImage()
 		}
 		val bitmapOptions = BitmapFactory.Options()
 		return try {
 			val rect = bitmapOptions.configureScale(regionDecoder.width, regionDecoder.height)
 			bitmapOptions.configureConfig()
-			val bitmap = regionDecoder.decodeRegion(rect, bitmapOptions)
+			val bitmap = regionDecoder.decodeRegion(rect, bitmapOptions) ?: return decodeFullImage()
 			bitmap.density = options.context.resources.displayMetrics.densityDpi
 			DecodeResult(
 				image = bitmap.asImage(),
 				isSampled = true,
 			)
+		} catch (_: Throwable) {
+			decodeFullImage()
 		} finally {
 			regionDecoder.recycle()
+		}
+	}
+
+	private fun decodeFullImage(): DecodeResult? {
+		val revivedFetchResult = fetchResult.copyWithNewSource()
+		return try {
+			val bitmap = revivedFetchResult.source.source().inputStream().use { input ->
+				BitmapDecoderCompat.decode(input, fetchResult.mimeType?.toMimeTypeOrNull())
+			}
+			bitmap.density = options.context.resources.displayMetrics.densityDpi
+			DecodeResult(
+				image = bitmap.asImage(),
+				isSampled = false,
+			)
+		} finally {
+			revivedFetchResult.source.close()
 		}
 	}
 
