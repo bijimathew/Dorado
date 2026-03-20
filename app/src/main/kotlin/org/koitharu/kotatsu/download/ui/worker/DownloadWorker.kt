@@ -37,15 +37,15 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.internal.closeQuietly
+import okhttp3.OkHttpClient
 import okio.IOException
 import okio.buffer
 import okio.sink
 import okio.use
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.image.BitmapDecoderCompat
+import org.koitharu.kotatsu.core.image.InkStoryImageDecoder
 import org.koitharu.kotatsu.core.model.ids
 import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.network.MangaHttpClient
@@ -411,16 +411,18 @@ class DownloadWorker @AssistedInject constructor(
 				try {
 					response.requireBody().use { body ->
 						val responseMimeType = body.contentType()?.toMimeType()
-						val inkStoryXorKey = extractInkStoryXorKey(url, source)
-						if (inkStoryXorKey != null) {
-							val decodedBytes = decodeInkStoryXor(body.bytes(), inkStoryXorKey)
-							val decodedMimeType = detectImageMimeType(decodedBytes)
-								?: responseMimeType?.takeIf { it.isImage }
+						if (InkStoryImageDecoder.isInkStorySource(source)) {
+							val payload = InkStoryImageDecoder.resolveNetworkPayload(
+								bytes = body.bytes(),
+								responseMimeType = responseMimeType,
+								pageUrl = url,
+								mangaSource = source,
+							) ?: throw IllegalStateException("InkStory payload is not a supported image")
 							file = destination.createTempFile(
-								ext = MimeTypes.getExtension(decodedMimeType),
+								ext = MimeTypes.getExtension(payload.mimeType),
 							).also { tempFiles += it }
 							file.sink(append = false).buffer().use {
-								it.write(decodedBytes)
+								it.write(payload.bytes)
 							}
 						} else {
 							file = destination.createTempFile(
@@ -605,42 +607,6 @@ class DownloadWorker @AssistedInject constructor(
 	}
 
 	private companion object {
-
-		private const val INK_STORY_FRAGMENT_PREFIX = "ik=xor:"
-		private val INK_STORY_SOURCES = setOf("MANGA_OVH", "MANGA_OVH_UPDATES")
-
-		private fun extractInkStoryXorKey(pageUrl: String, mangaSource: MangaSource): ByteArray? {
-			if (mangaSource.name !in INK_STORY_SOURCES) {
-				return null
-			}
-			val url = pageUrl.toHttpUrlOrNull() ?: return null
-			if (!url.host.endsWith("inuko.me") || !url.encodedPath.contains("/chapters/")) {
-				return null
-			}
-			val imageName = url.pathSegments.lastOrNull()
-				?.substringBeforeLast('.', "")
-				.orEmpty()
-			if (imageName.length != 36 || imageName.getOrNull(14) != 'x') {
-				return null
-			}
-			val fragment = url.fragment ?: return null
-			if (!fragment.startsWith(INK_STORY_FRAGMENT_PREFIX)) {
-				return null
-			}
-			val key = fragment.removePrefix(INK_STORY_FRAGMENT_PREFIX)
-			return key.takeIf { it.isNotBlank() }?.toByteArray()
-		}
-
-		private fun decodeInkStoryXor(source: ByteArray, key: ByteArray): ByteArray {
-			if (key.isEmpty()) {
-				return source
-			}
-			val result = ByteArray(source.size)
-			for (i in source.indices) {
-				result[i] = (source[i].toInt() xor key[i % key.size].toInt()).toByte()
-			}
-			return result
-		}
 
 		private fun detectImageMimeType(file: File): MimeType? {
 			if (!file.isFile || file.length() <= 0L) {

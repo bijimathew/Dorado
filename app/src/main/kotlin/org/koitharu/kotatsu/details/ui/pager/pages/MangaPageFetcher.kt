@@ -17,13 +17,22 @@ import okhttp3.OkHttpClient
 import okhttp3.Response
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
+import okio.Path.Companion.toPath
+import okio.buffer
+import okio.openZip
+import okio.source
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.image.BitmapDecoderCompat
+import org.koitharu.kotatsu.core.image.InkStoryImageDecoder
 import org.koitharu.kotatsu.core.network.imageproxy.ImageProxyInterceptor
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.fetch
+import org.koitharu.kotatsu.core.util.ext.isFileUri
 import org.koitharu.kotatsu.core.util.ext.isNetworkUri
+import org.koitharu.kotatsu.core.util.ext.isZipUri
+import org.koitharu.kotatsu.core.util.ext.MimeType
+import org.koitharu.kotatsu.core.util.ext.toMimeType
 import org.koitharu.kotatsu.core.util.ext.toMimeTypeOrNull
 import org.koitharu.kotatsu.local.data.LocalStorageCache
 import org.koitharu.kotatsu.local.data.PageCache
@@ -32,6 +41,7 @@ import org.koitharu.kotatsu.parsers.util.mimeType
 import org.koitharu.kotatsu.parsers.util.requireBody
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.reader.domain.PageLoader
+import java.io.File
 import javax.inject.Inject
 
 class MangaPageFetcher(
@@ -56,6 +66,15 @@ class MangaPageFetcher(
 		val pageUrl = repo.getPageUrl(page)
 		if (options.diskCachePolicy.readEnabled) {
 			pagesCache[pageUrl]?.let { file ->
+				if (BitmapDecoderCompat.probeMimeType(file) == null) {
+					recoverInkStoryCacheFile(pageUrl, file)?.let { (decodedFile, mimeType) ->
+						return SourceFetchResult(
+							source = ImageSource(decodedFile.toOkioPath(), options.fileSystem),
+							mimeType = mimeType.toString(),
+							dataSource = DataSource.DISK,
+						)
+					}
+				}
 				val mimeType = BitmapDecoderCompat.probeMimeType(file)
 					?: MimeTypes.getMimeTypeFromExtension(file.name)
 				return SourceFetchResult(
@@ -71,7 +90,16 @@ class MangaPageFetcher(
 	private suspend fun loadPage(pageUrl: String): FetchResult? = if (pageUrl.toUri().isNetworkUri()) {
 		fetchPage(pageUrl)
 	} else {
-		imageLoader.fetch(pageUrl, options)
+		runCatchingCancellable {
+			imageLoader.fetch(pageUrl, options)
+		}.getOrElse { error ->
+			val (file, mimeType) = repairLocalPage(pageUrl) ?: throw error
+			SourceFetchResult(
+				source = ImageSource(file.toOkioPath(), FileSystem.SYSTEM),
+				mimeType = mimeType.toString(),
+				dataSource = DataSource.DISK,
+			)
+		}
 	}
 
 	private suspend fun fetchPage(pageUrl: String): FetchResult {
@@ -80,16 +108,53 @@ class MangaPageFetcher(
 			if (!response.isSuccessful) {
 				throw HttpException(response.toNetworkResponse())
 			}
-			val mimeType = response.mimeType?.toMimeTypeOrNull()
-			val file = response.requireBody().use {
-				pagesCache.set(pageUrl, it.source(), mimeType)
+			val file = response.requireBody().use { body ->
+				val responseMimeType = body.contentType()?.toMimeType()
+				if (InkStoryImageDecoder.isInkStorySource(page.source)) {
+					val payload = InkStoryImageDecoder.resolveNetworkPayload(
+						bytes = body.bytes(),
+						responseMimeType = responseMimeType,
+						pageUrl = pageUrl,
+						mangaSource = page.source,
+					) ?: throw IllegalStateException("InkStory payload is not a supported image")
+					pagesCache.set(pageUrl, payload.bytes.inputStream().source(), payload.mimeType)
+				} else {
+					pagesCache.set(pageUrl, body.source(), responseMimeType)
+				}
 			}
+			val mimeType = BitmapDecoderCompat.probeMimeType(file)
+				?: MimeTypes.getMimeTypeFromExtension(file.name)
 			SourceFetchResult(
 				source = ImageSource(file.toOkioPath(), FileSystem.SYSTEM),
 				mimeType = mimeType?.toString(),
 				dataSource = DataSource.NETWORK,
 			)
 		}
+	}
+
+	private suspend fun recoverInkStoryCacheFile(pageUrl: String, file: File): Pair<File, MimeType>? {
+		val payload = InkStoryImageDecoder.resolveNetworkPayload(
+			bytes = file.readBytes(),
+			responseMimeType = MimeTypes.getMimeTypeFromExtension(file.name),
+			pageUrl = pageUrl,
+			mangaSource = page.source,
+		) ?: return null
+		return pagesCache.set(pageUrl, payload.bytes.inputStream().source(), payload.mimeType) to payload.mimeType
+	}
+
+	private suspend fun repairLocalPage(pageUrl: String): Pair<File, MimeType>? {
+		val uri = pageUrl.toUri()
+		val bytes = when {
+			uri.isZipUri() -> FileSystem.SYSTEM.openZip(uri.schemeSpecificPart.toPath()).use { zipFs ->
+				val entryPath = ("/" + uri.fragment.orEmpty()).toPath()
+				zipFs.source(entryPath).use { it.buffer().readByteArray() }
+			}
+
+			uri.isFileUri() -> File(requireNotNull(uri.path)).readBytes()
+			else -> return null
+		}
+		val payload = InkStoryImageDecoder.resolveLocalPayload(bytes) ?: return null
+		return pagesCache.set(pageUrl, payload.bytes.inputStream().source(), payload.mimeType) to payload.mimeType
 	}
 
 	private fun Response.toNetworkResponse() = NetworkResponse(

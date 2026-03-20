@@ -95,6 +95,9 @@ object BitmapDecoderCompat {
 	}
 
 	@Blocking
+	fun probeMimeType(bytes: ByteArray): MimeType? = detectBitmapType(bytes)
+
+	@Blocking
 	private fun detectBitmapType(file: File): MimeType? = runCatchingCancellable {
 		val options = BitmapFactory.Options().apply {
 			inJustDecodeBounds = true
