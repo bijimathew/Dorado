@@ -6,10 +6,12 @@ PUSH=false
 TARGET_BRANCH="devel"
 SOURCE_FILTER=""
 
+BASELINE_SPECS=(
+  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel"
+)
+
 SOURCE_SPECS=(
-  "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel||auto"
   "redo|https://github.com/Kotatsu-Redo/Kotatsu-Redo.git|devel|upstream|auto"
-  "yumemi|https://github.com/YumemiProject/Yumemi.git|devel|upstream|manual"
   "futon|https://github.com/AppFuton/Futon.git|devel|upstream|manual"
 )
 
@@ -33,7 +35,7 @@ Options:
   --push                  Push target branch to origin after successful apply.
   --branch <name>         Target branch to sync (default: devel).
   --sources <csv>         Comma-separated source remotes to include.
-                          Available: upstream,redo,yumemi,futon
+                          Available: redo,futon
   -h, --help              Show this help.
 EOF
 }
@@ -373,6 +375,18 @@ declare -A SOURCE_REFS
 declare -A SOURCE_BRANCHES
 declare -A SOURCE_BASES
 declare -A SOURCE_MODES
+
+for spec in "${BASELINE_SPECS[@]}"; do
+  IFS='|' read -r name url branch <<<"${spec}"
+  ensure_remote "${name}" "${url}"
+  log "Fetching baseline ${name}/${branch}..."
+  git fetch --prune "${name}" "${branch}"
+
+  SOURCE_REFS["${name}"]="${name}/${branch}"
+  SOURCE_BRANCHES["${name}"]="${branch}"
+  SOURCE_BASES["${name}"]=""
+  SOURCE_MODES["${name}"]="baseline"
+done
 
 for spec in "${SOURCE_SPECS[@]}"; do
   IFS='|' read -r name url branch base_name mode <<<"${spec}"
