@@ -5,6 +5,7 @@ APPLY=false
 PUSH=false
 TARGET_BRANCH="devel"
 SOURCE_FILTER=""
+MARK_REVIEWED=false
 
 BASELINE_SPECS=(
   "upstream|https://github.com/KotatsuApp/Kotatsu.git|devel"
@@ -33,6 +34,9 @@ Fetches upstream/fork branches and cherry-picks new stable commits into target.
 Options:
   --apply                 Perform cherry-picks. Default is dry-run report only.
   --push                  Push target branch to origin after successful apply.
+  --mark-reviewed         Record fetched source heads as reviewed so future syncs
+                          only consider newer commits. This happens automatically
+                          after successful auto-apply runs.
   --branch <name>         Target branch to sync (default: devel).
   --sources <csv>         Comma-separated source remotes to include.
                           Available: redo,futon
@@ -80,6 +84,25 @@ print_divergence() {
 
 commit_subject() {
   git log -1 --format='%s' "$1"
+}
+
+reviewed_ref_name() {
+  printf 'refs/fork-sync-reviewed/%s/%s' "${TARGET_BRANCH}" "$1"
+}
+
+get_reviewed_source_sha() {
+  local source_name="$1"
+  git rev-parse --verify -q "$(reviewed_ref_name "${source_name}")" 2>/dev/null || true
+}
+
+advance_reviewed_source() {
+  local source_name="$1"
+  local source_ref="$2"
+  local source_sha ref_name
+  source_sha="$(git rev-parse "${source_ref}")"
+  ref_name="$(reviewed_ref_name "${source_name}")"
+  git update-ref "${ref_name}" "${source_sha}"
+  log "Recorded ${source_name} as reviewed at ${source_sha:0:12}"
 }
 
 commit_has_runtime_changes() {
@@ -193,6 +216,19 @@ resolve_baseline() {
   return 0
 }
 
+apply_reviewed_baseline() {
+  local baseline="$1"
+  local reviewed_sha="$2"
+  local source_ref="$3"
+  if [[ -n "${reviewed_sha}" ]] &&
+    git merge-base --is-ancestor "${reviewed_sha}" "${source_ref}" 2>/dev/null &&
+    git merge-base --is-ancestor "${baseline}" "${reviewed_sha}" 2>/dev/null; then
+    printf '%s' "${reviewed_sha}"
+  else
+    printf '%s' "${baseline}"
+  fi
+}
+
 sync_source() {
   local source_name="$1"
   local source_branch="$2"
@@ -200,7 +236,7 @@ sync_source() {
   local base_source_name="$4"
   local source_mode="${5:-auto}"
   local base_ref=""
-  local baseline range
+  local baseline range reviewed_sha baseline_note
   local candidate_count
   local stable_count skipped_count
   local sha reason subject
@@ -213,7 +249,13 @@ sync_source() {
   fi
 
   baseline="$(resolve_baseline "${source_name}" "${source_branch}" "${source_ref}" "${base_ref}")"
+  reviewed_sha="$(get_reviewed_source_sha "${source_name}")"
+  baseline="$(apply_reviewed_baseline "${baseline}" "${reviewed_sha}" "${source_ref}")"
   range="${baseline}..${source_ref}"
+  baseline_note=""
+  if [[ -n "${reviewed_sha}" ]] && [[ "${baseline}" == "${reviewed_sha}" ]]; then
+    baseline_note=", reviewed:${reviewed_sha:0:12}"
+  fi
 
   if [[ -n "${base_ref}" ]]; then
     while IFS= read -r sha; do
@@ -229,7 +271,14 @@ sync_source() {
 
   candidate_count="${#candidate_commits[@]}"
   if (( candidate_count == 0 )); then
-    log "${source_ref} already included."
+    if [[ -n "${reviewed_sha}" ]] && [[ "${baseline}" == "${reviewed_sha}" ]]; then
+      log "${source_ref} has no commits newer than reviewed cursor ${reviewed_sha:0:12}."
+    else
+      log "${source_ref} already included."
+    fi
+    if [[ "${MARK_REVIEWED}" == "true" ]]; then
+      advance_reviewed_source "${source_name}" "${source_ref}"
+    fi
     return 0
   fi
 
@@ -251,9 +300,9 @@ sync_source() {
       mode_note=", mode:manual-review"
     fi
     if [[ -n "${base_ref}" ]]; then
-      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note} (range ${range}, excluding ${base_ref} and HEAD)"
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note}${baseline_note} (range ${range}, excluding ${base_ref} and HEAD)"
     else
-      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note} (range ${range}, excluding HEAD)"
+      log "Dry-run: ${source_ref} => candidates:${candidate_count} stable:${stable_count} skipped:${skipped_count}${mode_note}${baseline_note} (range ${range}, excluding HEAD)"
     fi
     if (( stable_count > 0 )); then
       for sha in "${stable_commits[@]:0:10}"; do
@@ -274,16 +323,25 @@ sync_source() {
         printf '    ... (%d more skipped commits)\n' "$((skipped_count - 5))"
       fi
     fi
+    if [[ "${MARK_REVIEWED}" == "true" ]]; then
+      advance_reviewed_source "${source_name}" "${source_ref}"
+    elif [[ "${source_mode}" == "manual" ]]; then
+      log "Tip: rerun with --sources ${source_name} --mark-reviewed after you decide to skip the current manual-review queue."
+    fi
     return 0
   fi
 
   if [[ "${source_mode}" == "manual" ]]; then
     log "Skipping auto-apply for ${source_ref}: source is marked as manual-review."
+    if [[ "${MARK_REVIEWED}" == "true" ]]; then
+      advance_reviewed_source "${source_name}" "${source_ref}"
+    fi
     return 0
   fi
 
   if (( stable_count == 0 )); then
     log "No stable commits to apply from ${source_ref} (skipped:${skipped_count})."
+    advance_reviewed_source "${source_name}" "${source_ref}"
     return 0
   fi
 
@@ -306,6 +364,7 @@ sync_source() {
   if (( skipped_count > 0 )); then
     log "Skipped ${skipped_count} non-stable commits from ${source_ref}."
   fi
+  advance_reviewed_source "${source_name}" "${source_ref}"
   return 0
 }
 
@@ -317,6 +376,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --push)
       PUSH=true
+      shift
+      ;;
+    --mark-reviewed)
+      MARK_REVIEWED=true
       shift
       ;;
     --branch)
