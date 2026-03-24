@@ -1,0 +1,4 @@
+- Publication-ready Kaisoku release with a unique Android application ID.
+- Crash report flow now opens GitHub Issues instead of the previous crash backend.
+- Updated app branding, links, icons, and splash assets for Kaisoku.
+- Important migration note: this build will not install over older builds using the previous package ID. Create a backup first, then restore it after installing Kaisoku.
