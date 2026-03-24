@@ -11,9 +11,9 @@ import androidx.core.net.toUri
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.nav.AppRouter
+import org.koitharu.kotatsu.core.util.ext.copyToClipboard
 import org.koitharu.kotatsu.core.util.ext.getSerializableExtraCompat
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
-import org.koitharu.kotatsu.core.util.ext.report
 
 class ErrorReporterReceiver : BroadcastReceiver() {
 
@@ -24,7 +24,16 @@ class ErrorReporterReceiver : BroadcastReceiver() {
 			val notificationTag = intent.getStringExtra(EXTRA_NOTIFICATION_TAG)
 			NotificationManagerCompat.from(context).cancel(notificationTag, notificationId)
 		}
-		e.report()
+		if (context != null) {
+			context.copyToClipboard(context.getString(R.string.error), e.stackTraceToString())
+			val openIssuesIntent = Intent(Intent.ACTION_VIEW, context.getString(R.string.url_error_report).toUri())
+				.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			runCatching {
+				context.startActivity(openIssuesIntent)
+			}.onFailure { err ->
+				err.printStackTraceDebug()
+			}
+		}
 	}
 
 	companion object {

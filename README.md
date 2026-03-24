@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> Fork of kotatsu mashed and vibe-coded out of other forks(red*, fut*, yum*), with some own fixes, no guarantee for stability
+> Vibecode-maintained Android manga reader with built-in online sources. No guarantee for full stability.
 
 ---
 
@@ -8,7 +8,7 @@
 **[Kaisoku](https://github.com/glitch-228/Kaisoku) is a free and open-source manga reader for Android with built-in
 online content sources.**
 
-![Android 6.0](https://img.shields.io/badge/android-6.0+-brightgreen) [![Sources count](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fglitch-228%2Fkaisoku-parsers%2Frefs%2Fheads%2Fmaster%2F.github%2Fsummary.yaml&query=total&label=manga%20sources&color=%23E9321C)](https://github.com/glitch-228/kaisoku-parsers) [![weblate](https://hosted.weblate.org/widgets/kotatsu/-/strings/svg-badge.svg)](https://hosted.weblate.org/engage/kotatsu/) [![License](https://img.shields.io/github/license/glitch-228/Kaisoku)](https://github.com/glitch-228/Kaisoku/blob/devel/LICENSE)
+![Android 6.0](https://img.shields.io/badge/android-6.0+-brightgreen) [![Sources count](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fglitch-228%2Fkaisoku-parsers%2Frefs%2Fheads%2Fmaster%2F.github%2Fsummary.yaml&query=total&label=manga%20sources&color=%23E9321C)](https://github.com/glitch-228/kaisoku-parsers) [![License](https://img.shields.io/github/license/glitch-228/Kaisoku)](https://github.com/glitch-228/Kaisoku/blob/devel/LICENSE)
 
 ### Main Features
 
@@ -49,18 +49,13 @@ online content sources.**
 
 ### Localization
 
-<a href="https://hosted.weblate.org/engage/kotatsu/">
-<img src="https://hosted.weblate.org/widget/kotatsu/horizontal-auto.png" alt="Translation status" />
-</a>
-
 **[Kaisoku](https://github.com/glitch-228/Kaisoku) is localized in a number of different languages.**<br>
 **📌 If you would like to help improve these or add new languages,
-please head over to the [Weblate project page](https://hosted.weblate.org/engage/kotatsu/)**
+please head over to the [Kotatsu-Redo Weblate page](https://hosted.weblate.org/engage/kotatsu/)**
 
 ### Support And Bug Reports
 
-- Discord: TBD
-- Telegram: TBD
+- Discord/Telegram: TBD at 30+stars
 - If you find a bug, open an issue in the [Issues tab](https://github.com/glitch-228/Kaisoku/issues).
 
 ### Contributing

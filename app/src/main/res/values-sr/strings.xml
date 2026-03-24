@@ -323,7 +323,7 @@
     <string name="saved_manga">Сачувана манга</string>
     <string name="screenshots_block_all">Увек блокирај</string>
     <string name="new_sources_text">Доступни су нови извори манге</string>
-    <string name="manga_error_description_pattern">Детаљи о грешци:&lt;br&gt;&lt;tt&gt;%1$s&lt;/tt&gt;&lt;br&gt;&lt;br&gt;1. Покушај да &lt;a href=%2$s&gt;отвориш мангу у веб прегледачу&lt;/a&gt; да би био сигуран да је доступна на извору&lt;br&gt;2. Увери се да користите &lt;a href=kotatsu://about&gt;latest version of Kaisoku&gt;најновију верзију Котатсу-а&lt;/a&gt;&lt;br&gt;3. Ако је доступно, пошаљи извештај о грешци програмерима.</string>
+    <string name="manga_error_description_pattern">Детаљи о грешци:&lt;br&gt;&lt;tt&gt;%1$s&lt;/tt&gt;&lt;br&gt;&lt;br&gt;1. Покушај да &lt;a href=%2$s&gt;отвориш мангу у веб прегледачу&lt;/a&gt; да би био сигуран да је доступна на извору&lt;br&gt;2. Увери се да користите &lt;a href=kaisoku://about&gt;latest version of Kaisoku&gt;најновију верзију Kaisoku&lt;/a&gt;&lt;br&gt;3. Ако је доступно, пошаљи извештај о грешци програмерима.</string>
     <string name="state_abandoned">Напуштен</string>
     <string name="zoom_mode_fit_height">Уклопи по висини</string>
     <string name="not_available">Није доступно</string>
@@ -397,7 +397,7 @@
     <string name="no_access_to_file">Немаш приступ овој датотеци или директоријуму</string>
     <string name="exclude_nsfw_from_history_summary">Манга означена за одрасле никада неће бити додата у историју и ваш напредак неће бити сачуван</string>
     <string name="mark_as_current">Означи као тренутно</string>
-    <string name="protect_application_summary">Затражи лозинку при покретању Котатсу-а</string>
+    <string name="protect_application_summary">Затражи лозинку при покретању Kaisoku</string>
     <string name="right_to_left">Са десна на лево</string>
     <string name="show_reading_indicators_summary">Прикажи проценат читања у Историји и Омиљеним</string>
     <string name="random">Насумично</string>
@@ -659,7 +659,7 @@
     <string name="external_source">Спољни/додатак</string>
     <string name="text_empty_holder_secondary_filtered">Нема Манге која одговара филтерима које си изабрао</string>
     <string name="connection_ok">Веза је У РЕДУ</string>
-    <string name="plugin_incompatible">Некомпатибилан додатак или интерна грешка. Увери се да користиш најновију верзију додатка и Котатсу-а</string>
+    <string name="plugin_incompatible">Некомпатибилан додатак или интерна грешка. Увери се да користиш најновију верзију додатка и Kaisoku</string>
     <string name="invalid_proxy_configuration">Неважећа конфигурација проксија</string>
     <string name="sfw">БЗП</string>
     <string name="seconds_short">%d с</string>
@@ -742,7 +742,7 @@
     <string name="allow_once">Дозволи једном</string>
     <string name="ask_every_time">Питај ме сваки пут</string>
     <string name="pages_saved">Странице су сачуване</string>
-    <string name="plugin_incompatible_with_cause">Грешка додатка: %s\n. Провери да ли користиш најновију верзију додатка и Котатсу-а</string>
+    <string name="plugin_incompatible_with_cause">Грешка додатка: %s\n. Провери да ли користиш најновију верзију додатка и Kaisoku</string>
     <string name="error_not_image">Неважећи формат: очекивана слика, али је добила %s</string>
     <string name="max_backups_count">Највећи дозвољен број резервних копија</string>
     <string name="access_denied_403">Приступ одбијен (403)</string>
@@ -767,7 +767,7 @@
     <string name="telegram_chat_id_summary">Унеси ИД ћаскања на који треба послати резервне копије</string>
     <string name="send_backups_telegram">Пошаљи резервне копије у Телеграм</string>
     <string name="test_connection">Провери везу</string>
-    <string name="open_telegram_bot_summary">Додирни да отвориш ћаскање са Котатсу Ботом за резервну копију</string>
+    <string name="open_telegram_bot_summary">Додирни да отвориш ћаскање са Kaisoku Ботом за резервну копију</string>
     <string name="clear_database">Избриши базу података</string>
     <string name="clear_database_summary">Избриши информације о Манги које се не користе</string>
     <string name="enable_all_sources_summary">Сви доступни Манга извори биће трајно омогућени</string>
@@ -795,9 +795,9 @@
     <string name="unnamed_chapter">Неименовано поглавље</string>
     <string name="chapter_number">Поглавље %s</string>
     <string name="error_disclaimer_manga">Пробај да отвориш Мангу у мрежном прегледачу да би се уверио да је доступна из извора.</string>
-    <string name="error_disclaimer_app_outdated">Изгледа да је твоја верзија Котатсу-а застарела. Молим инсталирај најновију верзију да би добио све доступне исправке.</string>
+    <string name="error_disclaimer_app_outdated">Изгледа да је твоја верзија Kaisoku застарела. Молим инсталирај најновију верзију да би добио све доступне исправке.</string>
     <string name="link_to_manga_on_s">Веза до Манге на %s</string>
-    <string name="link_to_manga_in_app">Повезница до Манге у Котатсу</string>
+    <string name="link_to_manga_in_app">Повезница до Манге у Kaisoku</string>
     <string name="no_write_permission_to_file">Нема дозволу за писање датотеке</string>
     <string name="clear_browser_data_summary">Избриши податке претраживача као што су кеш меморија и колачићи. Упозорење: Овлашћења у манга изворима могу постати неважећа</string>
     <string name="include_disabled_sources">Обухвати онемогућене изворе</string>
@@ -852,7 +852,7 @@
     <string name="discord_token_hint">Налепи свој Discord Токен овде</string>
     <string name="discord_rpc_summary">Прикажи свој статус читања на Дискорду</string>
     <string name="obtain">Добиј</string>
-    <string name="discord_rpc_description">Читање манге на Котатсу - апликацији за читање манги</string>
+    <string name="discord_rpc_description">Читање манге на Kaisoku - апликацији за читање манги</string>
     <string name="reading_s">Читам %s</string>
     <string name="read_on_s">Читај на %s</string>
     <string name="rpc_skip_nsfw_summary">Не користи RPC за садржај за одрасле</string>

@@ -51,7 +51,6 @@
 		android:backupAgent="org.koitharu.kotatsu.backups.domain.AppBackupAgent"
 		android:dataExtractionRules="@xml/backup_rules"
 		android:enableOnBackInvokedCallback="@bool/is_predictive_back_enabled"
-		android:extractNativeLibs="true"
 		android:fullBackupContent="@xml/backup_content"
 		android:fullBackupOnly="true"
 		android:hasFragileUserData="true"
@@ -101,6 +100,7 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
+				<data android:scheme="kaisoku" />
 				<data android:scheme="kotatsu" />
 				<data android:host="manga" />
 				<data android:host="kotatsu.app" />
@@ -156,6 +156,7 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
+				<data android:scheme="kaisoku" />
 				<data android:scheme="kotatsu" />
 				<data android:host="about" />
 				<data android:host="sync-settings" />
@@ -234,6 +235,7 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
+				<data android:scheme="kaisoku" />
 				<data android:scheme="kotatsu" />
 				<data android:host="reset-password" />
 			</intent-filter>
@@ -247,17 +249,18 @@
 			android:label="@string/settings"
 			android:launchMode="singleTop">
 
-			<intent-filter>
-				<action android:name="android.intent.action.VIEW" />
+				<intent-filter>
+					<action android:name="android.intent.action.VIEW" />
 
-				<category android:name="android.intent.category.DEFAULT" />
-				<category android:name="android.intent.category.BROWSABLE" />
+					<category android:name="android.intent.category.DEFAULT" />
+					<category android:name="android.intent.category.BROWSABLE" />
 
-				<data android:scheme="kotatsu" />
-				<data android:host="shikimori-auth" />
-				<data android:host="anilist-auth" />
-				<data android:host="mal-auth" />
-				<data android:host="kitsu-auth" />
+					<data android:scheme="kaisoku" />
+					<data android:scheme="kotatsu" />
+					<data android:host="shikimori-auth" />
+					<data android:host="anilist-auth" />
+					<data android:host="mal-auth" />
+					<data android:host="kitsu-auth" />
 			</intent-filter>
 
 		</activity>
@@ -269,12 +272,13 @@
 			android:exported="false"
 			android:label="@string/kitsu"
 			tools:ignore="AppLinkUrlError">
-			<intent-filter>
-				<action android:name="android.intent.action.VIEW" />
-				<category android:name="android.intent.category.DEFAULT" />
-				<data android:scheme="kotatsu+kitsu" />
-			</intent-filter>
-		</activity>
+				<intent-filter>
+					<action android:name="android.intent.action.VIEW" />
+					<category android:name="android.intent.category.DEFAULT" />
+					<data android:scheme="kaisoku+kitsu" />
+					<data android:scheme="kotatsu+kitsu" />
+				</intent-filter>
+			</activity>
 		<activity
 			android:name="org.koitharu.kotatsu.stats.ui.StatsActivity"
 			android:label="@string/reading_stats" />

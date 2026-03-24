@@ -12,6 +12,7 @@ import okhttp3.internal.http2.StreamResetException
 import okio.FileNotFoundException
 import okio.IOException
 import okio.ProtocolException
+import org.acra.ACRA
 import org.acra.ktx.sendSilentlyWithAcra
 import org.acra.ktx.sendWithAcra
 import org.jsoup.HttpStatusException
@@ -232,6 +233,9 @@ fun Throwable.isNetworkError(): Boolean {
 }
 
 fun Throwable.report(silent: Boolean = false) {
+    if (!ACRA.isInitialised) {
+        return
+    }
     val exception = CaughtException(this)
     if (!silent) {
         exception.sendWithAcra()
@@ -278,4 +282,3 @@ fun FileNotFoundException.parseMessage(resources: Resources): String? {
         )
     }
 }
-

@@ -804,11 +804,11 @@ class AppRouter private constructor(
             else -> true
         }
 
-        fun shortMangaUrl(mangaId: Long): Uri = Uri.Builder()
-            .scheme("kotatsu")
-            .path("manga")
-            .appendQueryParameter("id", mangaId.toString())
-            .build()
+	        fun shortMangaUrl(mangaId: Long): Uri = Uri.Builder()
+	            .scheme("kaisoku")
+	            .path("manga")
+	            .appendQueryParameter("id", mangaId.toString())
+	            .build()
 
         const val KEY_DATA = "data"
         const val KEY_ENTRIES = "entries"

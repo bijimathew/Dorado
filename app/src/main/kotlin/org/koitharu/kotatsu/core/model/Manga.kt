@@ -130,7 +130,7 @@ val Manga.isBroken: Boolean
 	get() = source == UnknownMangaSource
 
 val Manga.appUrl: Uri
-	get() = "https://kotatsu.app/manga".toUri()
+	get() = "kaisoku://manga".toUri()
 		.buildUpon()
 		.appendQueryParameter("source", source.name)
 		.appendQueryParameter("name", title)

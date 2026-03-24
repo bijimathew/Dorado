@@ -26,7 +26,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val CONTENT_TYPE_APK = "application/vnd.android.package-archive"
-private const val BUILD_TYPE_RELEASE = "release"
 
 @Singleton
 class AppUpdateRepository @Inject constructor(
@@ -146,9 +145,8 @@ class AppUpdateRepository @Inject constructor(
 		}.getOrNull()
 	}
 
-	@Suppress("KotlinConstantConditions")
-    fun isUpdateSupported(): Boolean {
-		return true
+	suspend fun isUpdateSupported(): Boolean {
+		return appValidator.isOriginalApp.getOrNull() == true
 	}
 
 	private inline fun JSONArray.find(predicate: (JSONObject) -> Boolean): JSONObject? {

@@ -85,9 +85,11 @@ open class BaseApp : Application(), Configuration.Provider {
 			Security.insertProviderAt(Conscrypt.newProvider(), 1)
 		}
 		setupActivityLifecycleCallbacks()
-		processLifecycleScope.launch {
-			ACRA.errorReporter.putCustomData("isOriginalApp", appValidator.isOriginalApp.getOrNull().toString())
-			ACRA.errorReporter.putCustomData("isMiui", RomCompat.isMiui.getOrNull().toString())
+		if (isCrashReportingEnabled() && ACRA.isInitialised) {
+			processLifecycleScope.launch {
+				ACRA.errorReporter.putCustomData("isOriginalApp", appValidator.isOriginalApp.getOrNull().toString())
+				ACRA.errorReporter.putCustomData("isMiui", RomCompat.isMiui.getOrNull().toString())
+			}
 		}
 		processLifecycleScope.launch(Dispatchers.Default) {
 			setupDatabaseObservers()
@@ -101,11 +103,15 @@ open class BaseApp : Application(), Configuration.Provider {
 		if (ACRA.isACRASenderServiceProcess()) {
 			return
 		}
+		val reportUrl = getString(R.string.acra_report_url).trim()
+		if (reportUrl.isEmpty()) {
+			return
+		}
 		initAcra {
 			buildConfigClass = BuildConfig::class.java
 			reportFormat = StringFormat.JSON
 			httpSender {
-				uri = getString(R.string.url_error_report)
+				uri = reportUrl
 				basicAuthLogin = getString(R.string.acra_login)
 				basicAuthPassword = getString(R.string.acra_password)
 				httpMethod = HttpSender.Method.POST
@@ -145,4 +151,6 @@ open class BaseApp : Application(), Configuration.Provider {
 			registerActivityLifecycleCallbacks(it)
 		}
 	}
+
+	private fun isCrashReportingEnabled(): Boolean = getString(R.string.acra_report_url).isNotBlank()
 }

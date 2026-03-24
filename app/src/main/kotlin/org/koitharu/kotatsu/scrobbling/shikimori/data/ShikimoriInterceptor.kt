@@ -9,7 +9,7 @@ import org.koitharu.kotatsu.scrobbling.common.domain.ScrobblerAuthRequiredExcept
 import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblerService
 import java.net.HttpURLConnection
 
-private const val USER_AGENT_SHIKIMORI = "Kotatsu"
+private const val USER_AGENT_SHIKIMORI = "Kaisoku"
 
 class ShikimoriInterceptor(private val storage: ScrobblerStorage) : Interceptor {
 

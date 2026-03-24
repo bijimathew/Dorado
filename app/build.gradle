@@ -25,11 +25,11 @@ android {
     }
 
     defaultConfig {
-		applicationId 'io.github.kotatsuredo.kotatsu'
+		applicationId 'io.github.glitch228.kaisoku'
 		minSdk = 23
 		targetSdk = 36
-		versionCode = 2027
-		versionName = '9.6.9-1'
+		versionCode = 2028
+		versionName = '9.6.9-2'
 		generatedDensities = []
 		testInstrumentationRunner 'org.koitharu.kotatsu.HiltTestRunner'
 		ksp {
@@ -68,6 +68,9 @@ android {
 		buildConfig true
 	}
 	packagingOptions {
+		jniLibs {
+			useLegacyPackaging true
+		}
 		resources {
 			excludes += [
 				'META-INF/README.md',

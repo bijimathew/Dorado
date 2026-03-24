@@ -16,7 +16,6 @@ import org.koitharu.kotatsu.core.util.ext.copyToClipboard
 import org.koitharu.kotatsu.core.util.ext.getCauseUrl
 import org.koitharu.kotatsu.core.util.ext.isHttpUrl
 import org.koitharu.kotatsu.core.util.ext.isReportable
-import org.koitharu.kotatsu.core.util.ext.report
 import org.koitharu.kotatsu.core.util.ext.requireSerializable
 import org.koitharu.kotatsu.core.util.ext.setTextAndVisible
 import org.koitharu.kotatsu.databinding.DialogErrorDetailsBinding
@@ -74,7 +73,8 @@ class ErrorDetailsDialog : AlertDialogFragment<DialogErrorDetailsBinding>(), Vie
 			}
 		} else if (exception.isReportable()) {
 			builder.setPositiveButton(R.string.report) { _, _ ->
-				exception.report(silent = true)
+				context?.copyToClipboard(getString(R.string.error), exception.stackTraceToString())
+				router.openExternalBrowser(getString(R.string.url_error_report), getString(R.string.report))
 				dismiss()
 			}
 		}
