@@ -1,0 +1,3 @@
+Disable NSFW content by default on fresh installs.
+Convert store metadata descriptions to HTML for F-Droid import.
+Prepare the app metadata for F-Droid autoupdate.
