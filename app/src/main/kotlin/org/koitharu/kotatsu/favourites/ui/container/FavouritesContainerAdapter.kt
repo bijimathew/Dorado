@@ -6,8 +6,9 @@ import androidx.recyclerview.widget.AsyncDifferConfig
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.adapter.FragmentStateAdapter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.FlowCollector
-import org.koitharu.kotatsu.core.ui.ListDiffExecutor
 import org.koitharu.kotatsu.favourites.ui.list.FavouritesListFragment
 import org.koitharu.kotatsu.list.ui.ListModelDiffCallback
 
@@ -17,7 +18,7 @@ class FavouritesContainerAdapter(fragment: Fragment) : FragmentStateAdapter(frag
 	private val differ = AsyncListDiffer(
 		AdapterListUpdateCallback(this),
 		AsyncDifferConfig.Builder(ListModelDiffCallback<FavouriteTabModel>())
-			.setBackgroundThreadExecutor(ListDiffExecutor.instance)
+			.setBackgroundThreadExecutor(Dispatchers.Default.limitedParallelism(2).asExecutor())
 			.build(),
 	)
 

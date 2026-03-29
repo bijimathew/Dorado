@@ -1,6 +1,7 @@
 package org.koitharu.kotatsu.core.ui.widgets
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.widget.ImageView
@@ -9,6 +10,7 @@ import androidx.annotation.DrawableRes
 import androidx.core.content.withStyledAttributes
 import androidx.core.view.isNotEmpty
 import androidx.core.view.isVisible
+import com.google.android.material.color.MaterialColors
 import org.koitharu.kotatsu.R
 
 class IconsView @JvmOverloads constructor(
@@ -82,6 +84,9 @@ class IconsView @JvmOverloads constructor(
 
 	private fun addImageView() = ImageView(context).also {
 		it.scaleType = ImageView.ScaleType.FIT_CENTER
+		it.imageTintList = ColorStateList.valueOf(
+			MaterialColors.getColor(it, com.google.android.material.R.attr.colorOnSecondaryContainer),
+		)
 		val lp = LayoutParams(iconSize, iconSize)
 		if (isNotEmpty()) {
 			lp.marginStart = iconSpacing

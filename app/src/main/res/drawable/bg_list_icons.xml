@@ -6,5 +6,5 @@
 	<corners
 		android:bottomRightRadius="4dp"
 		android:topRightRadius="4dp" />
-	<solid android:color="?colorBackgroundFloating" />
+	<solid android:color="?attr/colorSecondaryContainer" />
 </shape>

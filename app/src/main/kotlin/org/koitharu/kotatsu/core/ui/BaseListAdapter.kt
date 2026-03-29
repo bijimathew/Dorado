@@ -4,6 +4,8 @@ import androidx.recyclerview.widget.AsyncDifferConfig
 import androidx.recyclerview.widget.AsyncListDiffer.ListListener
 import com.hannesdorfmann.adapterdelegates4.AdapterDelegate
 import com.hannesdorfmann.adapterdelegates4.AsyncListDifferDelegationAdapter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +19,7 @@ import org.koitharu.kotatsu.list.ui.model.ListModel
 
 open class BaseListAdapter<T : ListModel> : AsyncListDifferDelegationAdapter<T>(
 	AsyncDifferConfig.Builder(ListModelDiffCallback<T>())
-		.setBackgroundThreadExecutor(ListDiffExecutor.instance)
+		.setBackgroundThreadExecutor(Dispatchers.Default.limitedParallelism(2).asExecutor())
 		.build(),
 ), FlowCollector<List<T>?> {
 

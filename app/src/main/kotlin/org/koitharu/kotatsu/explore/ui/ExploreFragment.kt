@@ -226,12 +226,25 @@ class ExploreFragment :
 	}
 
 	private fun onGridModeChanged(isGrid: Boolean) {
-		requireViewBinding().recyclerView.layoutManager = if (isGrid) {
+		val recyclerView = requireViewBinding().recyclerView
+		val currentLayoutManager = recyclerView.layoutManager
+		val matchesCurrentMode = when {
+			isGrid -> currentLayoutManager is GridLayoutManager
+			else -> currentLayoutManager is LinearLayoutManager && currentLayoutManager !is GridLayoutManager
+		}
+		if (matchesCurrentMode) {
+			return
+		}
+		val savedState = currentLayoutManager?.onSaveInstanceState()
+		recyclerView.layoutManager = if (isGrid) {
 			GridLayoutManager(requireContext(), 4).also { lm ->
 				lm.spanSizeLookup = ExploreGridSpanSizeLookup(checkNotNull(exploreAdapter), lm)
 			}
 		} else {
 			LinearLayoutManager(requireContext())
+		}
+		savedState?.let {
+			recyclerView.layoutManager?.onRestoreInstanceState(it)
 		}
 	}
 

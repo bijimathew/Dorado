@@ -17,7 +17,6 @@ import androidx.core.text.HtmlCompat
 import androidx.core.text.bold
 import androidx.core.text.buildSpannedString
 import androidx.core.text.parseAsHtml
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -88,7 +87,6 @@ import kotlin.math.pow
 import kotlin.random.Random
 import androidx.appcompat.R as appcompatR
 
-@HiltWorker
 class SuggestionsWorker @AssistedInject constructor(
 	@Assisted appContext: Context,
 	@Assisted params: WorkerParameters,

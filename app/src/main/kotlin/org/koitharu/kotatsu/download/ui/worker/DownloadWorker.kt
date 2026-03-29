@@ -7,7 +7,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.hilt.work.HiltWorker
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -102,7 +101,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
-@HiltWorker
 class DownloadWorker @AssistedInject constructor(
 	@Assisted appContext: Context,
 	@Assisted params: WorkerParameters,
