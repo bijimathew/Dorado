@@ -75,7 +75,8 @@ private fun Throwable.getDisplayMessageOrNull(resources: Resources): String? = w
         resources.getString(scrobbler.titleResId),
     )
 
-    is AuthRequiredException -> resources.getString(R.string.auth_required)
+    is AuthRequiredException -> cause?.message?.takeIf { it.isNotBlank() }
+        ?: resources.getString(R.string.auth_required)
     is InteractiveActionRequiredException -> resources.getString(R.string.additional_action_required)
     is CloudFlareProtectedException -> resources.getString(R.string.captcha_required_message)
     is CloudFlareBlockedException -> resources.getString(R.string.blocked_by_server_message)

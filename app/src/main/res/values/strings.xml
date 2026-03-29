@@ -123,6 +123,7 @@
     <string name="updates_feed_cleared">Cleared</string>
     <string name="rotate_screen">Rotate screen</string>
     <string name="update">Update</string>
+    <string name="refresh_extensions">Refresh extensions</string>
     <string name="feed_will_update_soon">Feed update will start soon</string>
     <string name="track_sources">Look for updates</string>
     <string name="dont_check">Don\'t check</string>
@@ -208,6 +209,7 @@
     <string name="exclude_nsfw_from_suggestions">Do not suggest NSFW manga</string>
     <string name="enabled">Enabled</string>
     <string name="disabled">Disabled</string>
+    <string name="extensions">Extensions</string>
     <string name="reset_filter">Reset filter</string>
     <string name="enter_name">Enter name</string>
     <string name="pinned_sources_only">Pinned sources only</string>
@@ -698,6 +700,7 @@
     <string name="chapters_read">Chapters read</string>
     <string name="chapters_left">Chapters left</string>
     <string name="external_source">External/plugin</string>
+    <string name="mihon_source">Mihon source</string>
     <string name="plugin_incompatible">Incompatible plugin or internal error. Make sure you are using the latest version of the plugin and Kaisoku</string>
     <string name="plugin_incompatible_with_cause">Plugin error: %s\n Make sure you are using the latest version of the plugin and Kaisoku</string>
     <string name="connection_ok">Connection is OK</string>

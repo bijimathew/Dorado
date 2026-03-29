@@ -12,6 +12,8 @@ import org.koitharu.kotatsu.core.model.MangaSource
 import org.koitharu.kotatsu.core.parser.MangaLoaderContextImpl
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
+import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaSource
@@ -45,12 +47,21 @@ class CommonHeadersInterceptor @Inject constructor(
 		repository?.getRequestHeaders()?.let {
 			headersBuilder.mergeWith(it, replaceExisting = false)
 		}
+		if (source is MihonMangaSource) {
+			MihonSourceRegistry.getPageHeaders(source, request.url.toString())?.let {
+				headersBuilder.mergeWith(it, replaceExisting = false)
+			}
+		}
 		if (headersBuilder[CommonHeaders.USER_AGENT] == null) {
 			headersBuilder[CommonHeaders.USER_AGENT] = mangaLoaderContextLazy.get().getDefaultUserAgent()
 		}
 		if (headersBuilder[CommonHeaders.REFERER] == null && repository != null) {
 			val idn = IDN.toASCII(repository.domain)
 			headersBuilder.trySet(CommonHeaders.REFERER, "https://$idn/")
+		} else if (headersBuilder[CommonHeaders.REFERER] == null && source is MihonMangaSource) {
+			MihonSourceRegistry.getDefaultReferer(source)?.let {
+				headersBuilder.trySet(CommonHeaders.REFERER, it)
+			}
 		}
 		val newRequest = request.newBuilder().headers(headersBuilder.build()).build()
 		return repository?.interceptSafe(ProxyChain(chain, newRequest)) ?: chain.proceed(newRequest)

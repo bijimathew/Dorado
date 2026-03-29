@@ -10,4 +10,10 @@
 		app:actionViewClass="androidx.appcompat.widget.SearchView"
 		app:showAsAction="ifRoom|collapseActionView" />
 
+	<item
+		android:id="@+id/action_refresh"
+		android:icon="@drawable/ic_sync"
+		android:title="@string.refresh_extensions"
+		app:showAsAction="ifRoom" />
+
 </menu>

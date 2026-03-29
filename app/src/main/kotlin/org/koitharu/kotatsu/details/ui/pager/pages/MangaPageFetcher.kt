@@ -40,7 +40,6 @@ import org.koitharu.kotatsu.parsers.model.MangaPage
 import org.koitharu.kotatsu.parsers.util.mimeType
 import org.koitharu.kotatsu.parsers.util.requireBody
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
-import org.koitharu.kotatsu.reader.domain.PageLoader
 import java.io.File
 import javax.inject.Inject
 
@@ -84,11 +83,11 @@ class MangaPageFetcher(
 				)
 			}
 		}
-		return loadPage(pageUrl)
+		return loadPage(repo, pageUrl)
 	}
 
-	private suspend fun loadPage(pageUrl: String): FetchResult? = if (pageUrl.toUri().isNetworkUri()) {
-		fetchPage(pageUrl)
+	private suspend fun loadPage(repo: MangaRepository, pageUrl: String): FetchResult? = if (pageUrl.toUri().isNetworkUri()) {
+		fetchPage(repo, pageUrl)
 	} else {
 		runCatchingCancellable {
 			imageLoader.fetch(pageUrl, options)
@@ -102,9 +101,10 @@ class MangaPageFetcher(
 		}
 	}
 
-	private suspend fun fetchPage(pageUrl: String): FetchResult {
-		val request = PageLoader.createPageRequest(pageUrl, page.source)
-		return imageProxyInterceptor.interceptPageRequest(request, okHttpClient).use { response ->
+	private suspend fun fetchPage(repo: MangaRepository, pageUrl: String): FetchResult {
+		val request = repo.createPageRequest(pageUrl, page)
+		val httpClient = repo.getImageClient() ?: okHttpClient
+		return imageProxyInterceptor.interceptPageRequest(request, httpClient).use { response ->
 			if (!response.isSuccessful) {
 				throw HttpException(response.toNetworkResponse())
 			}

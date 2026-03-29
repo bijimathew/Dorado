@@ -8,6 +8,7 @@ import android.content.Context
 import android.os.ParcelFileDescriptor
 import androidx.annotation.VisibleForTesting
 import com.google.common.io.ByteStreams
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.runBlocking
 import org.koitharu.kotatsu.backups.data.BackupRepository
 import org.koitharu.kotatsu.core.db.MangaDatabase
@@ -23,6 +24,9 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 class AppBackupAgent : BackupAgent() {
+
+	private val backupEntryPoint: BackupAgentEntryPoint
+		get() = EntryPointAccessors.fromApplication(applicationContext, BackupAgentEntryPoint::class.java)
 
 	override fun onBackup(
 		oldState: ParcelFileDescriptor?,
@@ -48,6 +52,7 @@ class AppBackupAgent : BackupAgent() {
 					context = applicationContext,
 					db = MangaDatabase(context = applicationContext),
 					settings = AppSettings(applicationContext),
+					mihonExtensionManager = backupEntryPoint.mihonExtensionManager,
 				),
 				savedFiltersRepository = SavedFiltersRepository(
 					context = applicationContext,
@@ -81,6 +86,7 @@ class AppBackupAgent : BackupAgent() {
 						context = applicationContext,
 						db = MangaDatabase(context = applicationContext),
 						settings = AppSettings(applicationContext),
+						mihonExtensionManager = backupEntryPoint.mihonExtensionManager,
 					),
 					savedFiltersRepository = SavedFiltersRepository(
 						context = applicationContext,

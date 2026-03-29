@@ -176,18 +176,19 @@ dependencies {
 	ksp libs.androidx.room.compiler
 
 	implementation libs.okhttp
+	implementation libs.okhttp.brotli
 	implementation libs.okhttp.tls
 	implementation libs.okhttp.dnsoverhttps
 	implementation libs.okio
 	implementation libs.kotlinx.serialization.json
+	implementation "io.reactivex:rxjava:1.3.8"
+	implementation "uy.kohesive.injekt:injekt-core:1.16.1"
 
 	implementation libs.adapterdelegates
 	implementation libs.adapterdelegates.viewbinding
 
 	implementation libs.hilt.android
 	ksp libs.hilt.compiler
-	implementation libs.androidx.hilt.work
-	ksp libs.androidx.hilt.compiler
 
 	implementation libs.coil.core
 	implementation libs.coil.network

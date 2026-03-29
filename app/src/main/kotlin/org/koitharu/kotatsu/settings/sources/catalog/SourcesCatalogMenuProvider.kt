@@ -27,7 +27,16 @@ class SourcesCatalogMenuProvider(
 		searchView.queryHint = searchMenuItem.title
 	}
 
-	override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+	override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+		return when (menuItem.itemId) {
+			R.id.action_refresh -> {
+				viewModel.refreshSources()
+				true
+			}
+
+			else -> false
+		}
+	}
 
 	override fun onMenuItemActionExpand(item: MenuItem): Boolean {
 		(activity as? AppBarOwner)?.appBar?.setExpanded(true, true)

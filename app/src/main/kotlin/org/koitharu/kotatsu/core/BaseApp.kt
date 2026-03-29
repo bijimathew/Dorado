@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Build
 import androidx.annotation.WorkerThread
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.hilt.work.HiltWorkerFactory
 import androidx.room.InvalidationTracker
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
@@ -27,6 +26,7 @@ import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.os.AppValidator
 import org.koitharu.kotatsu.core.os.RomCompat
 import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.core.work.AppWorkerFactory
 import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
 import org.koitharu.kotatsu.local.data.LocalStorageChanges
 import org.koitharu.kotatsu.local.data.index.LocalMangaIndex
@@ -53,7 +53,7 @@ open class BaseApp : Application(), Configuration.Provider {
 	lateinit var settings: AppSettings
 
 	@Inject
-	lateinit var workerFactory: HiltWorkerFactory
+	lateinit var workerFactory: AppWorkerFactory
 
 	@Inject
 	lateinit var appValidator: AppValidator

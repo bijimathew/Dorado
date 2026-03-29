@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
@@ -32,7 +33,6 @@ import org.koitharu.kotatsu.list.ui.model.LoadingState
 import org.koitharu.kotatsu.parsers.model.ContentType
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import java.util.EnumSet
-import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -43,16 +43,15 @@ class SourcesCatalogViewModel @Inject constructor(
 ) : BaseViewModel() {
 
 	val onActionDone = MutableEventFlow<ReversibleAction>()
-	val locales: Set<String?> = repository.allMangaSources.mapTo(HashSet<String?>()) { it.locale }.also {
-		it.add(null)
-	}
 
+	private val refreshTrigger = MutableStateFlow(0)
 	private val searchQuery = MutableStateFlow<String?>(null)
 	val appliedFilter = MutableStateFlow(
 		SourcesCatalogFilter(
 			types = emptySet(),
-			locale = Locale.getDefault().language.takeIf { it in locales },
+			locale = null,
 			isNewOnly = false,
+			isMihonOnly = false,
 		),
 	)
 
@@ -61,16 +60,32 @@ class SourcesCatalogViewModel @Inject constructor(
 
 	val contentTypes = MutableStateFlow<List<ContentType>>(emptyList())
 
-	private val sourcesSnapshot = db.invalidationTracker.createFlow(
-		tables = arrayOf(TABLE_SOURCES),
-		emitInitialState = true,
-	).mapLatest {
+	private val sourcesSnapshot = combine(
+		db.invalidationTracker.createFlow(
+			tables = arrayOf(TABLE_SOURCES),
+			emitInitialState = true,
+		),
+		repository.observeInstalledMihonSources().onStart { emit(emptyList()) },
+		refreshTrigger,
+	) { _, _, _ -> Unit }.mapLatest {
 		repository.getParserSourcesSnapshot()
 	}.stateIn(
 		viewModelScope + Dispatchers.IO,
 		SharingStarted.Eagerly,
 		null,
 	)
+
+	val locales: Set<String?>
+		get() = sourcesSnapshot.value
+			?.mapTo(HashSet<String?>()) { source ->
+				when (val value = source.source) {
+					is org.koitharu.kotatsu.parsers.model.MangaParserSource -> value.locale
+					is org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource -> value.resolved().locale
+					else -> null
+				}
+			}
+			?.also { it.add(null) }
+			?: repository.allMangaSources.mapTo(HashSet<String?>()) { it.locale }.also { it.add(null) }
 
 	val content: StateFlow<List<ListModel>> = combine(
 		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
@@ -125,6 +140,17 @@ class SourcesCatalogViewModel @Inject constructor(
 		appliedFilter.value = appliedFilter.value.copy(isNewOnly = value)
 	}
 
+	fun setMihonOnly(value: Boolean) {
+		appliedFilter.value = appliedFilter.value.copy(isMihonOnly = value)
+	}
+
+	fun refreshSources() {
+		launchJob(Dispatchers.IO) {
+			repository.refreshInstalledMihonSources()
+			refreshTrigger.value += 1
+		}
+	}
+
 	private suspend fun buildSourcesList(
 		filter: SourcesCatalogFilter,
 		query: String?,
@@ -137,6 +163,7 @@ class SourcesCatalogViewModel @Inject constructor(
 			types = filter.types,
 			query = query,
 			locale = filter.locale,
+			isMihonOnly = filter.isMihonOnly,
 			sortOrder = SourcesSortOrder.ALPHABETIC,
 			snapshot = snapshot,
 		)
