@@ -22,6 +22,8 @@ import org.koitharu.kotatsu.core.exceptions.ProxyConfigException
 import org.koitharu.kotatsu.core.exceptions.UnsupportedSourceException
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.router
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
+import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.util.ext.isHttpUrl
@@ -128,9 +130,17 @@ class ExceptionResolver private constructor(
         cloudflareContract.launch(e)
     }
 
-    private suspend fun resolveAuthException(source: MangaSource): Boolean = suspendCoroutine { cont ->
-        continuations[SourceAuthActivity.TAG] = cont
-        sourceAuthContract.launch(source)
+    private suspend fun resolveAuthException(source: MangaSource): Boolean {
+        if (source is MihonMangaSource) {
+            MihonSourceRegistry.getDefaultReferer(source)?.let {
+                host.router.openBrowser(it, source, null)
+            }
+            return false
+        }
+        return suspendCoroutine { cont ->
+            continuations[SourceAuthActivity.TAG] = cont
+            sourceAuthContract.launch(source)
+        }
     }
 
     private fun openInBrowser(url: String) {

@@ -1,0 +1,12 @@
+package org.koitharu.kotatsu.backups.domain
+
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface BackupAgentEntryPoint {
+	val mihonExtensionManager: MihonExtensionManager
+}

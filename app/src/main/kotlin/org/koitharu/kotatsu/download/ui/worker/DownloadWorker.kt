@@ -47,6 +47,7 @@ import org.koitharu.kotatsu.core.image.BitmapDecoderCompat
 import org.koitharu.kotatsu.core.image.InkStoryImageDecoder
 import org.koitharu.kotatsu.core.model.ids
 import org.koitharu.kotatsu.core.model.isLocal
+import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.network.imageproxy.ImageProxyInterceptor
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
@@ -88,12 +89,12 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.parsers.exception.TooManyRequestExceptions
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
+import org.koitharu.kotatsu.parsers.model.MangaPage
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
 import org.koitharu.kotatsu.parsers.util.mapToSet
 import org.koitharu.kotatsu.parsers.util.requireBody
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
-import org.koitharu.kotatsu.reader.domain.PageLoader
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -212,7 +213,14 @@ class DownloadWorker @AssistedInject constructor(
 				)
 				val coverUrl = mangaDetails.largeCoverUrl.ifNullOrEmpty { mangaDetails.coverUrl }
 				if (!coverUrl.isNullOrEmpty()) {
-					downloadFile(coverUrl, destination, repo.source, tempFiles).let { file ->
+					downloadFile(
+						url = coverUrl,
+						destination = destination,
+						source = repo.source,
+						tempFiles = tempFiles,
+						repository = repo,
+						page = MangaPage(-1L, coverUrl, null, repo.source),
+					).let { file ->
 						output.addCover(file, getMediaType(coverUrl, file))
 						file.deleteAwait()
 					}
@@ -237,7 +245,14 @@ class DownloadWorker @AssistedInject constructor(
 									runFailsafe {
 										val url = repo.getPageUrl(page)
 										val file = cache[url]
-											?: downloadFile(url, destination, repo.source, tempFiles)
+											?: downloadFile(
+												url = url,
+												destination = destination,
+												source = repo.source,
+												tempFiles = tempFiles,
+												repository = repo,
+												page = page,
+											)
 										output.addPage(
 											chapter = chapter,
 											file = file,
@@ -379,6 +394,8 @@ class DownloadWorker @AssistedInject constructor(
 		destination: File,
 		source: MangaSource,
 		tempFiles: MutableCollection<File>,
+		repository: org.koitharu.kotatsu.core.parser.MangaRepository? = null,
+		page: MangaPage? = null,
 	): File {
 		if (url.startsWith("content:", ignoreCase = true) || url.startsWith("file:", ignoreCase = true)) {
 			val uri = url.toUri()
@@ -400,9 +417,20 @@ class DownloadWorker @AssistedInject constructor(
 			}
 			return file
 		}
-		val request = PageLoader.createPageRequest(url, source)
+		val request = if (repository != null && page != null) {
+			repository.createPageRequest(url, page)
+		} else {
+			okhttp3.Request.Builder()
+				.url(url)
+				.get()
+				.header(CommonHeaders.ACCEPT, "image/webp,image/png;q=0.9,image/jpeg,*/*;q=0.8")
+				.cacheControl(CommonHeaders.CACHE_CONTROL_NO_STORE)
+				.tag(MangaSource::class.java, source)
+				.build()
+		}
+		val httpClient = repository?.getImageClient() ?: okHttp
 		slowdownDispatcher.delay(source)
-		return imageProxyInterceptor.interceptPageRequest(request, okHttp)
+		return imageProxyInterceptor.interceptPageRequest(request, httpClient)
 			.ensureSuccess()
 			.use { response ->
 				var file: File? = null

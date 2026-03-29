@@ -293,6 +293,7 @@ class PageLoader @Inject constructor(
 		isPrefetch: Boolean,
 		skipCache: Boolean,
 	): Uri = semaphore.withPermit {
+		val repo = getRepository(page.source)
 		val pageUrl = getPageUrl(page)
 		check(pageUrl.isNotBlank()) { "Cannot obtain full image url for $page" }
 		if (!skipCache) {
@@ -319,8 +320,9 @@ class PageLoader @Inject constructor(
 				if (isPrefetch) {
 					downloadSlowdownDispatcher.delay(page.source)
 				}
-				val request = createPageRequest(pageUrl, page.source)
-				imageProxyInterceptor.interceptPageRequest(request, okHttp).ensureSuccess().use { response ->
+				val request = repo.createPageRequest(pageUrl, page)
+				val httpClient = repo.getImageClient() ?: okHttp
+				imageProxyInterceptor.interceptPageRequest(request, httpClient).ensureSuccess().use { response ->
 					response.requireBody().withProgress(progress).use {
 						val responseMimeType = it.contentType()?.toMimeType()
 						if (InkStoryImageDecoder.isInkStorySource(page.source)) {
@@ -376,14 +378,6 @@ class PageLoader @Inject constructor(
 		private const val PROGRESS_UNDEFINED = -1f
 		private const val PREFETCH_LIMIT_DEFAULT = 6
 		private const val PREFETCH_MIN_RAM_MB = 80L
-
-		fun createPageRequest(pageUrl: String, mangaSource: MangaSource) = Request.Builder()
-			.url(pageUrl)
-			.get()
-			.header(CommonHeaders.ACCEPT, "image/webp,image/png;q=0.9,image/jpeg,*/*;q=0.8")
-			.cacheControl(CommonHeaders.CACHE_CONTROL_NO_STORE)
-			.tag(MangaSource::class.java, mangaSource)
-			.build()
 
 		private fun shouldValidateInkStoryCache(pageUrl: String, mangaSource: MangaSource): Boolean {
 			return InkStoryImageDecoder.shouldValidateCachedFile(pageUrl, mangaSource)

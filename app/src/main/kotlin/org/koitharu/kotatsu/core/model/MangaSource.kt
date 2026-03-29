@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.text.inSpans
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.util.ext.getDisplayName
 import org.koitharu.kotatsu.core.util.ext.toLocale
 import org.koitharu.kotatsu.core.util.ext.toLocaleOrNull
@@ -42,6 +43,13 @@ fun MangaSource(name: String?): MangaSource {
 		val parts = name.substringAfter(':').splitTwoParts('/') ?: return UnknownMangaSource
 		return ExternalMangaSource(packageName = parts.first, authority = parts.second)
 	}
+	if (name.startsWith("mihon:")) {
+		val parts = name.substringAfter(':').splitTwoParts('/') ?: return UnknownMangaSource
+		return MihonMangaSource(
+			packageName = parts.first,
+			sourceId = parts.second.toLongOrNull() ?: return UnknownMangaSource,
+		)
+	}
 	MangaParserSource.entries.forEach {
 		if (it.name == name) return it
 	}
@@ -53,6 +61,7 @@ fun Collection<String>.toMangaSources() = map(::MangaSource)
 fun MangaSource.isNsfw(): Boolean = when (this) {
 	is MangaSourceInfo -> mangaSource.isNsfw()
 	is MangaParserSource -> contentType == ContentType.HENTAI
+	is MihonMangaSource -> resolved().isNsfwSource
 	else -> false
 }
 
@@ -79,7 +88,11 @@ tailrec fun MangaSource.unwrap(): MangaSource = if (this is MangaSourceInfo) {
 	this
 }
 
-fun MangaSource.getLocale(): Locale? = (unwrap() as? MangaParserSource)?.locale?.toLocaleOrNull()
+fun MangaSource.getLocale(): Locale? = when (val source = unwrap()) {
+	is MangaParserSource -> source.locale.toLocaleOrNull()
+	is MihonMangaSource -> source.resolved().locale?.toLocaleOrNull()
+	else -> null
+}
 
 fun MangaSource.getSummary(context: Context): String? = when (val source = unwrap()) {
 	is MangaParserSource -> {
@@ -88,6 +101,14 @@ fun MangaSource.getSummary(context: Context): String? = when (val source = unwra
 		context.getString(R.string.source_summary_pattern, type, locale)
 	}
 
+	is MihonMangaSource -> source.resolved().locale?.toLocaleOrNull()?.let { locale ->
+		context.getString(
+			R.string.source_summary_pattern,
+			context.getString(R.string.mihon_source),
+			locale.getDisplayName(context),
+		)
+	} ?: context.getString(R.string.mihon_source)
+
 	is ExternalMangaSource -> context.getString(R.string.external_source)
 
 	else -> null
@@ -95,6 +116,7 @@ fun MangaSource.getSummary(context: Context): String? = when (val source = unwra
 
 fun MangaSource.getTitle(context: Context): String = when (val source = unwrap()) {
 	is MangaParserSource -> source.title
+	is MihonMangaSource -> source.resolveName(context)
 	LocalMangaSource -> context.getString(R.string.local_storage)
 	TestMangaSource -> context.getString(R.string.test_parser)
 	is ExternalMangaSource -> source.resolveName(context)

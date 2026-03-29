@@ -4,13 +4,19 @@ import android.content.Context
 import androidx.annotation.AnyThread
 import androidx.collection.ArrayMap
 import dagger.hilt.android.qualifiers.ApplicationContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.MangaSourceInfo
 import org.koitharu.kotatsu.core.model.TestMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
+import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
+import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaRepository
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.model.Manga
@@ -48,6 +54,16 @@ interface MangaRepository {
 
 	suspend fun getRelated(seed: Manga): List<Manga>
 
+	fun getImageClient(): OkHttpClient? = null
+
+	fun createPageRequest(pageUrl: String, page: MangaPage): Request = Request.Builder()
+		.url(pageUrl)
+		.get()
+		.header(CommonHeaders.ACCEPT, "image/webp,image/png;q=0.9,image/jpeg,*/*;q=0.8")
+		.cacheControl(CommonHeaders.CACHE_CONTROL_NO_STORE)
+		.tag(MangaSource::class.java, page.source)
+		.build()
+
 	suspend fun find(manga: Manga): Manga? {
 		val list = getList(0, SortOrder.RELEVANCE, MangaListFilter(query = manga.title))
 		return list.find { x -> x.id == manga.id }
@@ -60,6 +76,7 @@ interface MangaRepository {
 		private val loaderContext: MangaLoaderContext,
 		private val contentCache: MemoryContentCache,
 		private val mirrorSwitcher: MirrorSwitcher,
+		private val mihonExtensionManager: MihonExtensionManager,
 	) {
 
 		private val cache = ArrayMap<MangaSource, WeakReference<MangaRepository>>()
@@ -105,6 +122,13 @@ interface MangaRepository {
 			} else {
 				EmptyMangaRepository(source)
 			}
+
+			is MihonMangaSource -> mihonExtensionManager.resolve(source)?.let {
+				MihonMangaRepository(
+					loadedSource = it,
+					cache = contentCache,
+				)
+			} ?: EmptyMangaRepository(source)
 
 			else -> null
 		}

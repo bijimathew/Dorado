@@ -133,12 +133,22 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		// Update progress from first visible holder (for continuous display)
 		val lm = recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
 		val firstPos = lm?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+		val adapter = recyclerView.adapter as? BaseReaderAdapter<*>
 		val firstHolder = if (firstPos != RecyclerView.NO_POSITION) {
 			recyclerView.findViewHolderForAdapterPosition(firstPos) as? WebtoonHolder
 		} else null
-		val progress = firstHolder?.getScrollProgress() ?: -1f
+		val firstPage = adapter?.getItemOrNull(firstPos)
+		val progress = firstHolder?.getScrollProgress()
+			?: firstPage?.let { getSavedScrollPercent(it.chapterId, it.index) }
+			?: -1f
 		viewModel.updateScrollProgress(progress)
-		viewModel.updateScrollOffset(if (progress >= 0f) (progress * 10000).toInt() else 0)
+		viewModel.updateScrollOffset(
+			if (progress >= 0f) {
+				(progress * 10000).toInt()
+			} else {
+				firstPage?.let { getSavedScrollOffset(it.chapterId, it.index) } ?: 0
+			},
+		)
 		// Only notify page change when visible positions actually change
 		if (firstVisiblePosition != lastFirstPos || lastVisiblePosition != lastLastPos) {
 			lastFirstPos = firstVisiblePosition
@@ -146,8 +156,15 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 			// Compute scroll from centerPos holder (matches what ViewModel uses for chapterId/page)
 			val centerPos = (firstVisiblePosition + lastVisiblePosition) / 2
 			val centerHolder = recyclerView.findViewHolderForAdapterPosition(centerPos) as? WebtoonHolder
-			val centerProgress = centerHolder?.getScrollProgress() ?: 0f
-			val scrollPercent = if (centerProgress >= 0f) (centerProgress * 10000).toInt() else 0
+			val centerPage = adapter?.getItemOrNull(centerPos)
+			val centerProgress = centerHolder?.getScrollProgress()
+				?: centerPage?.let { getSavedScrollPercent(it.chapterId, it.index) }
+				?: 0f
+			val scrollPercent = if (centerProgress >= 0f) {
+				(centerProgress * 10000).toInt()
+			} else {
+				centerPage?.let { getSavedScrollOffset(it.chapterId, it.index) } ?: 0
+			}
 			viewModel.onCurrentPageChanged(firstVisiblePosition, lastVisiblePosition, progress, scrollPercent)
 		}
 	}
@@ -172,7 +189,12 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 					firstVisibleItemPosition = position
 					postRestoreScroll(this, position, pendingState.scroll)
 				}
-				viewModel.onCurrentPageChanged(position, position)
+				viewModel.onCurrentPageChanged(
+					position,
+					position,
+					scrollProgress = pendingState.scroll / 10000f,
+					scrollOffset = pendingState.scroll,
+				)
 			} else {
 				Snackbar.make(requireView(), R.string.not_found_404, Snackbar.LENGTH_SHORT)
 					.show()
@@ -190,13 +212,31 @@ class WebtoonReaderFragment : BaseReaderFragment<FragmentReaderWebtoonBinding>()
 		val adapter = recyclerView.adapter as? BaseReaderAdapter<*>
 		val page = adapter?.getItemOrNull(currentItem) ?: return@run null
 		val holder = recyclerView.findViewHolderForAdapterPosition(currentItem) as? WebtoonHolder
-		val progress = holder?.getScrollProgress() ?: 0f
-		android.util.Log.d("WS", "getCurrentState item=$currentItem chapterId=${page.chapterId} page=${page.index} progress=$progress scroll=${(progress * 10000).toInt()}")
+		val fallbackScroll = getSavedScrollOffset(page.chapterId, page.index)
+		val progress = holder?.getScrollProgress() ?: getSavedScrollPercent(page.chapterId, page.index)
+		val scroll = if (progress >= 0f) {
+			(progress * 10000).toInt()
+		} else {
+			fallbackScroll
+		}
+		android.util.Log.d("WS", "getCurrentState item=$currentItem chapterId=${page.chapterId} page=${page.index} progress=$progress scroll=$scroll")
 		ReaderState(
 			chapterId = page.chapterId,
 			page = page.index,
-			scroll = (progress * 10000).toInt(),
+			scroll = scroll,
 		)
+	}
+
+	private fun getSavedScrollOffset(chapterId: Long, pageIndex: Int): Int {
+		return viewModel.getCurrentState()
+			?.takeIf { it.chapterId == chapterId && it.page == pageIndex }
+			?.scroll
+			?: 0
+	}
+
+	private fun getSavedScrollPercent(chapterId: Long, pageIndex: Int): Float {
+		val scroll = getSavedScrollOffset(chapterId, pageIndex)
+		return if (scroll > 0) scroll / 10000f else -1f
 	}
 
 	private fun postRestoreScroll(rv: RecyclerView, position: Int, scrollPercent: Int) {

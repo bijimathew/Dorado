@@ -90,6 +90,7 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		when (data) {
 			is ContentType -> viewModel.setContentType(data, !chip.isChecked)
 			is Boolean -> viewModel.setNewOnly(!chip.isChecked)
+			is SourcesCatalogChip -> viewModel.setMihonOnly(!chip.isChecked)
 			else -> showLocalesMenu(chip)
 		}
 	}
@@ -133,6 +134,12 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 				data = true,
 			)
 		}
+		chips += ChipModel(
+			title = getString(R.string.extensions),
+			icon = R.drawable.ic_sync,
+			isChecked = appliedFilter.isMihonOnly,
+			data = SourcesCatalogChip.Mihon,
+		)
 		contentTypes.mapTo(chips) { type ->
 			ChipModel(
 				title = getString(type.titleResId),
@@ -141,6 +148,10 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 			)
 		}
 		viewBinding.chipsFilter.setChips(chips)
+	}
+
+	private enum class SourcesCatalogChip {
+		Mihon,
 	}
 
 	private fun showLocalesMenu(anchor: View) {

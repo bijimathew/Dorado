@@ -15,6 +15,8 @@ import org.koitharu.kotatsu.core.util.ext.setTextAndVisible
 import org.koitharu.kotatsu.databinding.ItemEmptyHintBinding
 import org.koitharu.kotatsu.databinding.ItemSourceCatalogBinding
 import org.koitharu.kotatsu.list.ui.model.ListModel
+import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import androidx.appcompat.R as appcompatR
 
 fun sourceCatalogItemSourceAD(
@@ -42,10 +44,11 @@ fun sourceCatalogItemSourceAD(
 	bind {
 		binding.textViewTitle.text = item.source.getTitle(context)
 		binding.textViewDescription.text = item.source.getSummary(context)
-		binding.textViewDescription.drawableStart = if (item.source.isBroken) {
-			ContextCompat.getDrawable(context, R.drawable.ic_off_small)
-		} else {
-			null
+		val parserSource = item.source as? MangaParserSource
+		binding.textViewDescription.drawableStart = when {
+			parserSource?.isBroken == true -> ContextCompat.getDrawable(context, R.drawable.ic_off_small)
+			item.source is MihonMangaSource -> ContextCompat.getDrawable(context, R.drawable.ic_sync)
+			else -> null
 		}
 		FaviconDrawable(context, R.style.FaviconDrawable_Small, item.source.name)
 		binding.imageViewIcon.setImageAsync(item.source)
