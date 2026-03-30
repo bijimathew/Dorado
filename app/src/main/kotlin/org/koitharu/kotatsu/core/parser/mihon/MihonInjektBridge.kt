@@ -16,8 +16,8 @@ import javax.inject.Singleton
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.InjektModule
 import uy.kohesive.injekt.api.InjektRegistrar
-import uy.kohesive.injekt.api.addSingleton
-import uy.kohesive.injekt.api.addSingletonFactory
+import uy.kohesive.injekt.api.TypeReference
+import java.lang.reflect.Type
 
 @Singleton
 class MihonInjektBridge @Inject constructor(
@@ -35,6 +35,8 @@ class MihonInjektBridge @Inject constructor(
 		if (initialized) {
 			return
 		}
+		val application = context.applicationContext as Application
+		val applicationContext = context.applicationContext
 		val json = Json {
 			ignoreUnknownKeys = true
 			explicitNulls = false
@@ -44,16 +46,20 @@ class MihonInjektBridge @Inject constructor(
 		}
 		Injekt.importModule(object : InjektModule {
 			override fun InjektRegistrar.registerInjectables() {
-				addSingleton(context.applicationContext as Application)
-				addSingletonFactory<Context> { context.applicationContext }
-				addSingletonFactory<NetworkHelper> { networkHelper }
-				addSingletonFactory<OkHttpClient> { httpClient }
-				addSingletonFactory<CookieJar> { cookieJar }
-				addSingleton(json)
-				addSingletonFactory<StringFormat> { json }
-				addSingletonFactory<SerialFormat> { json }
+				addSingleton(typeReference(Application::class.java), application)
+				addSingleton(typeReference(Context::class.java), applicationContext)
+				addSingleton(typeReference(NetworkHelper::class.java), networkHelper)
+				addSingleton(typeReference(OkHttpClient::class.java), httpClient)
+				addSingleton(typeReference(CookieJar::class.java), cookieJar)
+				addSingleton(typeReference(Json::class.java), json)
+				addSingleton(typeReference(StringFormat::class.java), json)
+				addSingleton(typeReference(SerialFormat::class.java), json)
 			}
 		})
 		initialized = true
+	}
+
+	private fun <T> typeReference(type: Type): TypeReference<T> = object : TypeReference<T> {
+		override val type: Type = type
 	}
 }
