@@ -63,7 +63,7 @@ class SearchViewModel @Inject constructor(
 
 	private var includeDisabledSources = MutableStateFlow(false)
 	private var pinnedOnly = MutableStateFlow(false)
-	private var hideEmpty = MutableStateFlow(false)
+	private var hideEmpty = MutableStateFlow(true)
 	private val results = MutableStateFlow<List<SearchResultsListModel>>(emptyList())
 
 	private var searchJob: Job? = null
@@ -129,9 +129,13 @@ class SearchViewModel @Inject constructor(
 		}
 	}
 
+	fun isPinnedOnlyEnabled(): Boolean = pinnedOnly.value
+
 	fun setHideEmpty(value: Boolean) {
 		hideEmpty.value = value
 	}
+
+	fun isHideEmptyEnabled(): Boolean = hideEmpty.value
 
 	fun continueSearch() {
 		if (includeDisabledSources.value) {

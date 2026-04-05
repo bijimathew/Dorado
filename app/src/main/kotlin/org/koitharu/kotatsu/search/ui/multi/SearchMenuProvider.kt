@@ -20,6 +20,8 @@ class SearchMenuProvider(
 
 	override fun onPrepareMenu(menu: Menu) {
 		super.onPrepareMenu(menu)
+		menu.findItem(R.id.action_filter_pinned_only)?.isChecked = viewModel.isPinnedOnlyEnabled()
+		menu.findItem(R.id.action_filter_hide_empty)?.isChecked = viewModel.isHideEmptyEnabled()
 		menu.findItem(
 			when (viewModel.kind) {
 				SearchKind.SIMPLE -> R.id.action_kind_simple
