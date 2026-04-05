@@ -115,6 +115,10 @@ class MihonMangaRepository(
 
 	override suspend fun getPageUrl(page: MangaPage): String = withContext(Dispatchers.IO) {
 		val uri = page.url.toUri()
+		if (uri.isDirectPageUrl()) {
+			val rawImageUrl = uri.getQueryParameter("image_url").orEmpty()
+			return@withContext rawImageUrl.takeIf { it.isNotBlank() }?.let(::absolutizeUrl) ?: page.url
+		}
 		if (uri.scheme != RESOLVE_SCHEME) {
 			return@withContext page.url
 		}
@@ -138,7 +142,7 @@ class MihonMangaRepository(
 	override fun createPageRequest(pageUrl: String, page: MangaPage): Request {
 		val httpSource = mihonSource as? HttpSource
 		val request = if (httpSource != null) {
-			MihonSourceRegistry.getPage(source, pageUrl)?.let { storedPage ->
+			(MihonSourceRegistry.getPage(source, pageUrl) ?: page.toStoredMihonPage(pageUrl))?.let { storedPage ->
 				try {
 					httpSource.imageRequest(storedPage)
 				} catch (e: Throwable) {
@@ -288,13 +292,44 @@ class MihonMangaRepository(
 	private fun buildDirectPageUrl(index: Int, rawPageUrl: String, rawImageUrl: String): String {
 		return Uri.Builder()
 			.scheme("https")
-			.authority("mihon.invalid")
+			.authority(DIRECT_PAGE_HOST)
 			.appendPath("page")
 			.appendQueryParameter("index", index.toString())
 			.appendQueryParameter("page_url", rawPageUrl)
 			.appendQueryParameter("image_url", rawImageUrl)
 			.build()
 			.toString()
+	}
+
+	private fun MangaPage.toStoredMihonPage(resolvedUrl: String): Page? {
+		val uri = url.toUri()
+		val index = uri.getQueryParameter("index")?.toIntOrNull() ?: id.toInt()
+		return when {
+			uri.isDirectPageUrl() -> {
+				val rawPageUrl = uri.getQueryParameter("page_url").orEmpty()
+				val rawImageUrl = uri.getQueryParameter("image_url").orEmpty()
+				Page(
+					index = index,
+					url = rawPageUrl,
+					imageUrl = rawImageUrl.ifBlank { resolvedUrl },
+				)
+			}
+
+			uri.scheme == RESOLVE_SCHEME -> {
+				val rawPageUrl = uri.getQueryParameter("page_url").orEmpty()
+				Page(
+					index = index,
+					url = rawPageUrl,
+					imageUrl = resolvedUrl,
+				)
+			}
+
+			else -> null
+		}
+	}
+
+	private fun Uri.isDirectPageUrl(): Boolean {
+		return host == DIRECT_PAGE_HOST && lastPathSegment == DIRECT_PAGE_PATH
 	}
 
 	private fun canUseDirectPreview(rawUrl: String): Boolean {
@@ -402,6 +437,8 @@ class MihonMangaRepository(
 
 	private companion object {
 		private const val RESOLVE_SCHEME = "mihon-resolve"
+		private const val DIRECT_PAGE_HOST = "mihon.invalid"
+		private const val DIRECT_PAGE_PATH = "page"
 		private const val LONG_HASH_SEED = 1125899906842597L
 	}
 }
