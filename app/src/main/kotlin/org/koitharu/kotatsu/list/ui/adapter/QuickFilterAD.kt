@@ -6,6 +6,7 @@ import org.koitharu.kotatsu.databinding.ItemQuickFilterBinding
 import org.koitharu.kotatsu.list.domain.ListFilterOption
 import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.QuickFilter
+import java.lang.ref.WeakReference
 
 fun quickFilterAD(
 	listener: QuickFilterClickListener,
@@ -13,13 +14,22 @@ fun quickFilterAD(
 	{ layoutInflater, parent -> ItemQuickFilterBinding.inflate(layoutInflater, parent, false) }
 ) {
 
-	binding.chipsTags.onChipClickListener = ChipsView.OnChipClickListener { chip, data ->
-		if (data is ListFilterOption) {
-			listener.onFilterOptionClick(data)
-		}
-	}
+	binding.chipsTags.onChipClickListener = WeakQuickFilterChipClickListener(listener)
 
 	bind {
 		binding.chipsTags.setChips(item.items)
+	}
+}
+
+private class WeakQuickFilterChipClickListener(
+	listener: QuickFilterClickListener,
+) : ChipsView.OnChipClickListener {
+
+	private val listenerRef = WeakReference(listener)
+
+	override fun onChipClick(chip: com.google.android.material.chip.Chip, data: Any?) {
+		if (data is ListFilterOption) {
+			listenerRef.get()?.onFilterOptionClick(data)
+		}
 	}
 }

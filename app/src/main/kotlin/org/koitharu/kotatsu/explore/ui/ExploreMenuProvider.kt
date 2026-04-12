@@ -17,6 +17,11 @@ class ExploreMenuProvider(
 
 	override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
 		return when (menuItem.itemId) {
+			R.id.action_add_mihon_sources -> {
+				router.openMihonExtensionRepos(showAddDialog = true)
+				true
+			}
+
 			R.id.action_manage -> {
 				router.openSourcesSettings()
 				true

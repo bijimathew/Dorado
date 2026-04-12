@@ -9,7 +9,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
@@ -17,7 +16,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.MangaSource
 import org.koitharu.kotatsu.core.model.distinctById
@@ -72,40 +73,35 @@ open class RemoteListViewModel @Inject constructor(
 	private val mangaList = MutableStateFlow<List<Manga>?>(null)
 	private val hasNextPage = MutableStateFlow(false)
 	private val listError = MutableStateFlow<Throwable?>(null)
+	private val mutableContent = MutableStateFlow<List<ListModel>>(listOf(LoadingState))
 	private var loadingJob: Job? = null
 	private var randomJob: Job? = null
+	private var contentJob: Job? = null
 
-	override val content = combine(
-		mangaList.map { it?.skipNsfwIfNeeded() },
-		observeListModeWithTriggers(),
-		listError,
-		hasNextPage,
-	) { list, mode, error, hasNext ->
-		buildList(list?.size?.plus(2) ?: 2) {
-			when {
-				list.isNullOrEmpty() && error != null -> add(
-					error.toErrorState(
-						canRetry = true,
-						secondaryAction = if (error.getCauseUrl().isNullOrEmpty()) 0 else R.string.open_in_browser,
-					),
-				)
-
-				list == null -> add(LoadingState)
-				list.isEmpty() -> add(createEmptyState(canResetFilter = filterCoordinator.isFilterApplied))
-				else -> {
-					mapMangaList(this, list, mode)
-					when {
-						error != null -> add(error.toErrorFooter())
-						hasNext -> add(LoadingFooter())
-						else -> getFooter()?.let(::add)
-					}
-				}
-			}
-			onBuildList(this)
-		}
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Lazily, listOf(LoadingState))
+	override val content = mutableContent
 
 	init {
+		contentJob = combine(
+			mangaList.map { it?.skipNsfwIfNeeded() },
+			observeListModeWithTriggers(),
+			listError,
+			hasNextPage,
+		) { list, mode, error, hasNext ->
+			buildRemoteListContent(
+				list = list,
+				mode = mode,
+				error = error,
+				hasNext = hasNext,
+				canResetFilter = filterCoordinator.isFilterApplied,
+				createEmptyState = ::createEmptyState,
+				mapMangaList = ::mapMangaList,
+				getFooter = ::getFooter,
+				onBuildList = ::onBuildList,
+			)
+		}.onEach { list ->
+			mutableContent.value = list
+		}.launchIn(viewModelScope + Dispatchers.Default)
+
 		filterCoordinator.observe()
 			.debounce(FILTER_MIN_INTERVAL)
 			.onEach { filterState ->
@@ -116,14 +112,25 @@ open class RemoteListViewModel @Inject constructor(
 				listError.value = error
 			}.launchIn(viewModelScope)
 
+		val currentSource = source
 		launchJob(Dispatchers.Default) {
-			sourcesRepository.trackUsage(source)
+			trackSourceUsage(sourcesRepository, currentSource)
 		}
 
-        if (source is MangaParserSource && source.isBroken) {
-            // Just notify one. Will show reason in future
-            onSourceBroken.call(Unit)
-        }
+		if (source is MangaParserSource && source.isBroken) {
+			// Just notify one. Will show reason in future
+			onSourceBroken.call(Unit)
+		}
+	}
+
+	override fun onCleared() {
+		contentJob?.cancel()
+		loadingJob?.cancel()
+		randomJob?.cancel()
+		contentJob = null
+		loadingJob = null
+		randomJob = null
+		super.onCleared()
 	}
 
 	override fun onRefresh() {
@@ -144,34 +151,26 @@ open class RemoteListViewModel @Inject constructor(
 		loadingJob?.let {
 			if (it.isActive) return it
 		}
-		return launchLoadingJob(Dispatchers.Default) {
+		val currentLoadingCounter = loadingCounter
+		val currentRepository = repository
+		val currentMangaList = mangaList
+		val currentHasNextPage = hasNextPage
+		val currentListError = listError
+		val currentErrorEvent = errorEvent
+		return viewModelScope.launch(Dispatchers.Default) {
+			currentLoadingCounter.update { it + 1 }
 			try {
-				listError.value = null
-				val list = repository.getList(
-					offset = if (append) mangaList.value.sizeOrZero() else 0,
-					order = filterState.sortOrder,
-					filter = filterState.listFilter,
+				loadRemoteList(
+					repository = currentRepository,
+					mangaList = currentMangaList,
+					hasNextPage = currentHasNextPage,
+					listError = currentListError,
+					errorEvent = currentErrorEvent,
+					filterState = filterState,
+					append = append,
 				)
-				val prevList = mangaList.value.orEmpty()
-				if (!append) {
-					mangaList.value = list.distinctById()
-				} else if (list.isNotEmpty()) {
-					mangaList.value = (prevList + list).distinctById()
-				}
-				hasNextPage.value = if (append) {
-					prevList != mangaList.value
-				} else {
-					list.size > prevList.size || hasNextPage.value
-				}
-			} catch (e: CancellationException) {
-				throw e
-			} catch (e: Throwable) {
-				e.printStackTraceDebug()
-				listError.value = e
-				if (!mangaList.value.isNullOrEmpty()) {
-					errorEvent.call(e)
-				}
-				hasNextPage.value = false
+			} finally {
+				currentLoadingCounter.update { it - 1 }
 			}
 		}.also { loadingJob = it }
 	}
@@ -207,11 +206,125 @@ open class RemoteListViewModel @Inject constructor(
 		if (randomJob?.isActive == true) {
 			return
 		}
-		randomJob = launchLoadingJob(Dispatchers.Default) {
-			isRandomLoading.value = true
-			val manga = exploreRepository.findRandomManga(source, 16)
-			onOpenManga.call(manga)
-			isRandomLoading.value = false
+		val currentLoadingCounter = loadingCounter
+		val currentExploreRepository = exploreRepository
+		val currentSource = source
+		val currentRandomLoading = isRandomLoading
+		val currentOnOpenManga = onOpenManga
+		val currentErrorEvent = errorEvent
+		randomJob = viewModelScope.launch(Dispatchers.Default) {
+			currentLoadingCounter.update { it + 1 }
+			try {
+				openRandomManga(
+					exploreRepository = currentExploreRepository,
+					source = currentSource,
+					isRandomLoading = currentRandomLoading,
+					onOpenManga = currentOnOpenManga,
+					onError = currentErrorEvent,
+				)
+			} finally {
+				currentLoadingCounter.update { it - 1 }
+			}
 		}
+	}
+}
+
+private suspend fun trackSourceUsage(
+	sourcesRepository: MangaSourcesRepository,
+	source: org.koitharu.kotatsu.parsers.model.MangaSource,
+) {
+	sourcesRepository.trackUsage(source)
+}
+
+private suspend fun buildRemoteListContent(
+	list: List<Manga>?,
+	mode: ListMode,
+	error: Throwable?,
+	hasNext: Boolean,
+	canResetFilter: Boolean,
+	createEmptyState: (Boolean) -> EmptyState,
+	mapMangaList: suspend (MutableCollection<in ListModel>, Collection<Manga>, ListMode) -> Unit,
+	getFooter: () -> ButtonFooter?,
+	onBuildList: suspend (MutableList<ListModel>) -> Unit,
+): List<ListModel> = buildList(list?.size?.plus(2) ?: 2) {
+	when {
+		list.isNullOrEmpty() && error != null -> add(
+			error.toErrorState(
+				canRetry = true,
+				secondaryAction = if (error.getCauseUrl().isNullOrEmpty()) 0 else R.string.open_in_browser,
+			),
+		)
+
+		list == null -> add(LoadingState)
+		list.isEmpty() -> add(createEmptyState(canResetFilter))
+		else -> {
+			mapMangaList(this, list, mode)
+			when {
+				error != null -> add(error.toErrorFooter())
+				hasNext -> add(LoadingFooter())
+				else -> getFooter()?.let(::add)
+			}
+		}
+	}
+	onBuildList(this)
+}
+
+private suspend fun loadRemoteList(
+	repository: MangaRepository,
+	mangaList: MutableStateFlow<List<Manga>?>,
+	hasNextPage: MutableStateFlow<Boolean>,
+	listError: MutableStateFlow<Throwable?>,
+	errorEvent: MutableEventFlow<Throwable>,
+	filterState: FilterCoordinator.Snapshot,
+	append: Boolean,
+) {
+	try {
+		listError.value = null
+		val list = repository.getList(
+			offset = if (append) mangaList.value.sizeOrZero() else 0,
+			order = filterState.sortOrder,
+			filter = filterState.listFilter,
+		)
+		val prevList = mangaList.value.orEmpty()
+		if (!append) {
+			mangaList.value = list.distinctById()
+		} else if (list.isNotEmpty()) {
+			mangaList.value = (prevList + list).distinctById()
+		}
+		hasNextPage.value = if (append) {
+			prevList != mangaList.value
+		} else {
+			list.size > prevList.size || hasNextPage.value
+		}
+	} catch (e: CancellationException) {
+		throw e
+	} catch (e: Throwable) {
+		e.printStackTraceDebug()
+		listError.value = e
+		if (!mangaList.value.isNullOrEmpty()) {
+			errorEvent.call(e)
+		}
+		hasNextPage.value = false
+	}
+}
+
+private suspend fun openRandomManga(
+	exploreRepository: ExploreRepository,
+	source: org.koitharu.kotatsu.parsers.model.MangaSource,
+	isRandomLoading: MutableStateFlow<Boolean>,
+	onOpenManga: MutableEventFlow<Manga>,
+	onError: MutableEventFlow<Throwable>,
+) {
+	isRandomLoading.value = true
+	try {
+		val manga = exploreRepository.findRandomManga(source, 16)
+		onOpenManga.call(manga)
+	} catch (e: CancellationException) {
+		throw e
+	} catch (e: Throwable) {
+		e.printStackTraceDebug()
+		onError.call(e)
+	} finally {
+		isRandomLoading.value = false
 	}
 }

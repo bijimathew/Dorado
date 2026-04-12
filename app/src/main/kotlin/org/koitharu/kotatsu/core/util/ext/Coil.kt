@@ -52,6 +52,10 @@ fun ImageRequest.Builder.mangaSourceExtra(source: MangaSource?): ImageRequest.Bu
 	extras[mangaSourceKey] = source
 }
 
+fun ImageRequest.Builder.faviconCacheOnly(isCacheOnly: Boolean = true): ImageRequest.Builder = apply {
+	extras[faviconCacheOnlyKey] = isCacheOnly
+}
+
 fun ImageRequest.Builder.mangaExtra(manga: Manga?): ImageRequest.Builder = apply {
 	extras[mangaKey] = manga
 	mangaSourceExtra(manga?.source)
@@ -71,6 +75,7 @@ suspend fun ImageLoader.fetch(data: Any, options: Options): FetchResult? {
 val mangaKey = Extras.Key<Manga?>(null)
 val bookmarkKey = Extras.Key<Bookmark?>(null)
 val mangaSourceKey = Extras.Key<MangaSource?>(null)
+val faviconCacheOnlyKey = Extras.Key(false)
 
 @CheckResult
 fun SourceFetchResult.copyWithNewSource(): SourceFetchResult = SourceFetchResult(

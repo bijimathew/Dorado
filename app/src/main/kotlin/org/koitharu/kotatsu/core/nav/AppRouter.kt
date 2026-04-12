@@ -100,6 +100,8 @@ import org.koitharu.kotatsu.settings.override.OverrideConfigActivity
 import org.koitharu.kotatsu.settings.reader.ReaderTapGridConfigActivity
 import org.koitharu.kotatsu.settings.sources.auth.SourceAuthActivity
 import org.koitharu.kotatsu.settings.sources.catalog.SourcesCatalogActivity
+import org.koitharu.kotatsu.settings.sources.repo.MihonExtensionReposActivity
+import org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity
 import org.koitharu.kotatsu.settings.storage.MangaDirectorySelectDialog
 import org.koitharu.kotatsu.settings.storage.directories.MangaDirectoriesActivity
 import org.koitharu.kotatsu.settings.tracker.categories.TrackerCategoriesConfigSheet
@@ -206,6 +208,21 @@ class AppRouter private constructor(
     }
 
     fun openSourcesCatalog() = startActivity(SourcesCatalogActivity::class.java)
+
+    fun openMihonExtensionRepos(showAddDialog: Boolean = false) {
+        startActivity(
+            Intent(contextOrNull() ?: return, MihonExtensionReposActivity::class.java)
+                .putExtra(MihonExtensionReposActivity.EXTRA_SHOW_ADD_REPO_DIALOG, showAddDialog),
+        )
+    }
+
+    fun openMihonRepoExtensions(baseUrl: String, title: String? = null) {
+        startActivity(
+            Intent(contextOrNull() ?: return, MihonRepoExtensionsActivity::class.java)
+                .putExtra(KEY_URL, baseUrl)
+                .putExtra(KEY_TITLE, title),
+        )
+    }
 
     fun openDownloads() = startActivity(DownloadsActivity::class.java)
 

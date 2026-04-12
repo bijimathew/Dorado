@@ -5,8 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
@@ -26,6 +27,7 @@ import org.koitharu.kotatsu.core.ui.util.ReversibleAction
 import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.mapSortedByCount
+import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.explore.data.SourcesSortOrder
 import org.koitharu.kotatsu.list.ui.model.ListModel
@@ -58,54 +60,68 @@ class SourcesCatalogViewModel @Inject constructor(
 	val hasNewSources = repository.observeHasNewSources()
 		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Lazily, false)
 
-	val contentTypes = MutableStateFlow<List<ContentType>>(emptyList())
+	val contentTypes = MutableStateFlow(getContentTypes(settings.isNsfwContentDisabled))
 
-	private val sourcesSnapshot = combine(
-		db.invalidationTracker.createFlow(
-			tables = arrayOf(TABLE_SOURCES),
-			emitInitialState = true,
-		),
-		repository.observeInstalledMihonSources().onStart { emit(emptyList()) },
-		refreshTrigger,
-	) { _, _, _ -> Unit }.mapLatest {
-		repository.getParserSourcesSnapshot()
-	}.stateIn(
-		viewModelScope + Dispatchers.IO,
-		SharingStarted.Eagerly,
-		null,
-	)
+	private val sourcesSnapshot = MutableStateFlow<List<MangaSourcesRepository.ParserSourceSnapshot>?>(null)
+	private val mutableContent = MutableStateFlow<List<ListModel>>(listOf(LoadingState))
+
+	val content: StateFlow<List<ListModel>> = mutableContent
 
 	val locales: Set<String?>
 		get() = sourcesSnapshot.value
-			?.mapTo(HashSet<String?>()) { source ->
-				when (val value = source.source) {
-					is org.koitharu.kotatsu.parsers.model.MangaParserSource -> value.locale
-					is org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource -> value.resolved().locale
-					else -> null
-				}
-			}
+			?.mapTo(HashSet<String?>()) { source -> source.locale }
 			?.also { it.add(null) }
 			?: repository.allMangaSources.mapTo(HashSet<String?>()) { it.locale }.also { it.add(null) }
 
-	val content: StateFlow<List<ListModel>> = combine(
-		searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
-		appliedFilter.map { it }.distinctUntilChanged(),
-		sourcesSnapshot.filterNotNull(),
-	) { q, f, snapshot ->
-		Triple(q, f, snapshot)
-	}.conflate().mapLatest { (q, f, snapshot) ->
-		buildSourcesList(
-			filter = f,
-			query = q,
-			snapshot = snapshot,
-		)
-	}.distinctUntilChanged()
-		.stateIn(viewModelScope + Dispatchers.IO, SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS), listOf(LoadingState))
-
 	init {
 		repository.clearNewSourcesBadge()
-		launchJob(Dispatchers.Default) {
-			contentTypes.value = getContentTypes(settings.isNsfwContentDisabled)
+		launchJob(Dispatchers.IO) {
+			combine(
+				db.invalidationTracker.createFlow(
+					tables = arrayOf(TABLE_SOURCES),
+					emitInitialState = true,
+				),
+				repository.observeInstalledMihonSources().onStart { emit(emptyList()) },
+				refreshTrigger,
+			) { _, _, _ -> Unit }.mapLatest {
+				runCatching {
+					repository.getParserSourcesSnapshot()
+				}.onFailure { error ->
+					error.printStackTraceDebug()
+					errorEvent.call(error)
+					if (sourcesSnapshot.value == null) {
+						mutableContent.value = buildErrorHintList()
+					}
+				}.getOrElse { sourcesSnapshot.value }
+			}.collect { snapshot ->
+				if (snapshot != null) {
+					sourcesSnapshot.value = snapshot
+				}
+			}
+		}
+		launchJob(Dispatchers.IO) {
+			combine(
+				searchQuery.debounce(SEARCH_DEBOUNCE_TIMEOUT).distinctUntilChanged(),
+				appliedFilter,
+				sourcesSnapshot.filterNotNull(),
+			) { q, f, snapshot ->
+				Triple(q, f, snapshot)
+			}.conflate().mapLatest { (q, f, snapshot) ->
+				runCatching {
+					buildSourcesList(
+						filter = f,
+						query = q,
+						snapshot = snapshot,
+					)
+				}.onFailure { error ->
+					error.printStackTraceDebug()
+					errorEvent.call(error)
+				}.getOrElse {
+					mutableContent.value.takeUnless { list -> list == listOf(LoadingState) } ?: buildErrorHintList()
+				}
+			}.distinctUntilChanged().collect { list ->
+				mutableContent.value = list
+			}
 		}
 	}
 
@@ -200,8 +216,15 @@ class SourcesCatalogViewModel @Inject constructor(
 		}
 	}
 
+	private fun buildErrorHintList(): List<SourceCatalogItem> = listOf(
+		SourceCatalogItem.Hint(
+			icon = R.drawable.ic_empty_feed,
+			title = R.string.error_occurred,
+			text = R.string.error_details,
+		),
+	)
+
 	private companion object {
 		private const val SEARCH_DEBOUNCE_TIMEOUT = 180L
-		private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 	}
 }

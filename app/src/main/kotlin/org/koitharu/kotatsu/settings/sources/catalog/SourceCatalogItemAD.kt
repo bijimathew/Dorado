@@ -50,8 +50,7 @@ fun sourceCatalogItemSourceAD(
 			item.source is MihonMangaSource -> ContextCompat.getDrawable(context, R.drawable.ic_sync)
 			else -> null
 		}
-		FaviconDrawable(context, R.style.FaviconDrawable_Small, item.source.name)
-		binding.imageViewIcon.setImageAsync(item.source)
+		binding.imageViewIcon.setImageAsync(item.source, cacheOnly = true)
 	}
 }
 

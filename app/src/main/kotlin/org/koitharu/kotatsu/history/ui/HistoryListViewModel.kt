@@ -3,14 +3,15 @@ package org.koitharu.kotatsu.history.ui
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.MangaHistory
@@ -48,12 +49,11 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import kotlinx.coroutines.flow.SharedFlow
 
 private const val PAGE_SIZE = 16
-private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 
 @HiltViewModel
 class HistoryListViewModel @Inject constructor(
 	private val repository: HistoryRepository,
-	settings: AppSettings,
+	private val settings: AppSettings,
 	private val mangaListMapper: MangaListMapper,
 	private val markAsReadUseCase: MarkAsReadUseCase,
 	private val quickFilter: HistoryListQuickFilter,
@@ -82,6 +82,7 @@ class HistoryListViewModel @Inject constructor(
 
 	private val limit = MutableStateFlow(PAGE_SIZE)
 	private val isPaginationReady = AtomicBoolean(false)
+	private var contentJob: Job? = null
 
 	val isStatsEnabled = settings.observeAsStateFlow(
 		scope = viewModelScope + Dispatchers.Default,
@@ -89,23 +90,37 @@ class HistoryListViewModel @Inject constructor(
 		valueProducer = { isStatsEnabled },
 	)
 
-	override val content = combine(
-		quickFilter.appliedOptions,
-		observeHistory(),
-		isGroupingEnabled,
-		observeListModeWithTriggers(),
-		settings.observeAsFlow(AppSettings.KEY_INCOGNITO_MODE) { isIncognitoModeEnabled },
-	) { filters, list, grouped, mode, incognito ->
-		mapList(list, grouped, mode, filters, incognito)
-	}.distinctUntilChanged().onEach {
-		isPaginationReady.set(true)
-	}.catch { e ->
-		emit(listOf(e.toErrorState(canRetry = false)))
-	}.stateIn(
-		viewModelScope + Dispatchers.Default,
-		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
-		listOf(LoadingState),
-	)
+	override val content = MutableStateFlow<List<ListModel>>(listOf(LoadingState))
+
+	init {
+		val appliedFilters = quickFilter.appliedOptions
+		val history = observeHistoryFlow(
+			sortOrder = sortOrder,
+			filters = appliedFilters.combineWithSettings(),
+			limit = limit,
+			repository = repository,
+			isPaginationReady = isPaginationReady,
+		)
+		val contentState = content
+		contentJob = createHistoryContentFlow(
+			appliedFilters = appliedFilters,
+			history = history,
+			isGroupingEnabled = isGroupingEnabled,
+			listMode = observeListModeWithTriggers(),
+			isIncognito = settings.observeAsFlow(AppSettings.KEY_INCOGNITO_MODE) { isIncognitoModeEnabled },
+			sortOrder = sortOrder,
+			quickFilter = quickFilter,
+			mangaListMapper = mangaListMapper,
+			isPaginationReady = isPaginationReady,
+		).onEach { contentState.value = it }
+			.launchIn(viewModelScope + Dispatchers.Default)
+	}
+
+	override fun onCleared() {
+		contentJob?.cancel()
+		contentJob = null
+		super.onCleared()
+	}
 
 	override fun onRefresh() = Unit
 
@@ -152,109 +167,151 @@ class HistoryListViewModel @Inject constructor(
 			limit.value += PAGE_SIZE
 		}
 	}
+}
 
-	private fun observeHistory() = combine(
-		sortOrder,
-		quickFilter.appliedOptions.combineWithSettings(),
-		limit,
-	) { order, filters, limit ->
-		isPaginationReady.set(false)
-		repository.observeAllWithHistory(order, filters, limit)
-	}.flattenLatest()
+private fun observeHistoryFlow(
+	sortOrder: Flow<ListSortOrder>,
+	filters: Flow<Set<ListFilterOption>>,
+	limit: Flow<Int>,
+	repository: HistoryRepository,
+	isPaginationReady: AtomicBoolean,
+): Flow<List<MangaWithHistory>> = combine(
+	sortOrder,
+	filters,
+	limit,
+) { order, filters, limit ->
+	isPaginationReady.set(false)
+	repository.observeAllWithHistory(order, filters, limit)
+}.flattenLatest()
 
-	private suspend fun mapList(
-		list: List<MangaWithHistory>,
-		grouped: Boolean,
-		mode: ListMode,
-		filters: Set<ListFilterOption>,
-		isIncognito: Boolean,
-	): List<ListModel> {
-		if (list.isEmpty()) {
-			return if (filters.isEmpty()) {
-				listOf(getEmptyState(hasFilters = false))
-			} else {
-				listOfNotNull(quickFilter.filterItem(filters), getEmptyState(hasFilters = true))
-			}
+private fun createHistoryContentFlow(
+	appliedFilters: Flow<Set<ListFilterOption>>,
+	history: Flow<List<MangaWithHistory>>,
+	isGroupingEnabled: Flow<Boolean>,
+	listMode: Flow<ListMode>,
+	isIncognito: Flow<Boolean>,
+	sortOrder: Flow<ListSortOrder>,
+	quickFilter: HistoryListQuickFilter,
+	mangaListMapper: MangaListMapper,
+	isPaginationReady: AtomicBoolean,
+): Flow<List<ListModel>> = org.koitharu.kotatsu.core.util.ext.combine(
+	appliedFilters,
+	history,
+	isGroupingEnabled,
+	listMode,
+	isIncognito,
+	sortOrder,
+) { filters, list, grouped, mode, incognito, order ->
+	mapHistoryContent(
+		list = list,
+		grouped = grouped,
+		mode = mode,
+		filters = filters,
+		isIncognito = incognito,
+		sortOrder = order,
+		quickFilter = quickFilter,
+		mangaListMapper = mangaListMapper,
+	)
+}.distinctUntilChanged().onEach {
+	isPaginationReady.set(true)
+}.catch { e ->
+	emit(listOf(e.toErrorState(canRetry = false)))
+}
+
+private suspend fun mapHistoryContent(
+	list: List<MangaWithHistory>,
+	grouped: Boolean,
+	mode: ListMode,
+	filters: Set<ListFilterOption>,
+	isIncognito: Boolean,
+	sortOrder: ListSortOrder,
+	quickFilter: HistoryListQuickFilter,
+	mangaListMapper: MangaListMapper,
+): List<ListModel> {
+	if (list.isEmpty()) {
+		return if (filters.isEmpty()) {
+			listOf(historyEmptyState(hasFilters = false))
+		} else {
+			listOfNotNull(quickFilter.filterItem(filters), historyEmptyState(hasFilters = true))
 		}
-		val result = ArrayList<ListModel>((if (grouped) (list.size * 1.4).toInt() else list.size) + 2)
-		quickFilter.filterItem(filters)?.let(result::add)
-		if (isIncognito) {
-			result += InfoModel(
-				key = AppSettings.KEY_INCOGNITO_MODE,
-				title = R.string.incognito_mode,
-				text = R.string.incognito_mode_hint,
-				icon = R.drawable.ic_incognito,
-			)
-		}
-		val mangaModels = mangaListMapper.toListModelList(
-			manga = list.mapTo(ArrayList(list.size)) { it.manga },
-			mode = mode,
+	}
+	val result = ArrayList<ListModel>((if (grouped) (list.size * 1.4).toInt() else list.size) + 2)
+	quickFilter.filterItem(filters)?.let(result::add)
+	if (isIncognito) {
+		result += InfoModel(
+			key = AppSettings.KEY_INCOGNITO_MODE,
+			title = R.string.incognito_mode,
+			text = R.string.incognito_mode_hint,
+			icon = R.drawable.ic_incognito,
 		)
-		val order = sortOrder.value
-		var prevHeader: ListHeader? = null
-		var isEmpty = true
-		for (index in list.indices) {
-			val history = list[index].history
-			isEmpty = false
-			if (grouped) {
-				val header = history.header(order)
-				if (header != prevHeader) {
-					if (header != null) {
-						result += header
-					}
-					prevHeader = header
+	}
+	val mangaModels = mangaListMapper.toListModelList(
+		manga = list.mapTo(ArrayList(list.size)) { it.manga },
+		mode = mode,
+	)
+	var prevHeader: ListHeader? = null
+	var isEmpty = true
+	for (index in list.indices) {
+		val history = list[index].history
+		isEmpty = false
+		if (grouped) {
+			val header = history.header(sortOrder)
+			if (header != prevHeader) {
+				if (header != null) {
+					result += header
 				}
+				prevHeader = header
 			}
-			result += mangaModels[index]
 		}
-		if (filters.isNotEmpty() && isEmpty) {
-			result += getEmptyState(hasFilters = true)
-		}
-		return result
+		result += mangaModels[index]
 	}
-
-	private fun MangaHistory.header(order: ListSortOrder): ListHeader? = when (order) {
-		ListSortOrder.LAST_READ,
-		ListSortOrder.LONG_AGO_READ -> calculateTimeAgo(updatedAt)?.let {
-			ListHeader(it)
-		} ?: ListHeader(R.string.unknown)
-
-		ListSortOrder.OLDEST,
-		ListSortOrder.NEWEST -> calculateTimeAgo(createdAt)?.let {
-			ListHeader(it)
-		} ?: ListHeader(R.string.unknown)
-
-		ListSortOrder.UNREAD,
-		ListSortOrder.PROGRESS -> ListHeader(
-			when {
-				ReadingProgress.isCompleted(percent) -> R.string.status_completed
-				percent in 0f..0.01f -> R.string.status_planned
-				percent in 0f..1f -> R.string.status_reading
-				else -> R.string.unknown
-			},
-		)
-
-		ListSortOrder.ALPHABETIC,
-		ListSortOrder.ALPHABETIC_REVERSE,
-		ListSortOrder.RELEVANCE,
-		ListSortOrder.NEW_CHAPTERS,
-		ListSortOrder.UPDATED,
-		ListSortOrder.RATING -> null
+	if (filters.isNotEmpty() && isEmpty) {
+		result += historyEmptyState(hasFilters = true)
 	}
+	return result
+}
 
-	private fun getEmptyState(hasFilters: Boolean) = if (hasFilters) {
-		EmptyState(
-			icon = R.drawable.ic_empty_history,
-			textPrimary = R.string.nothing_found,
-			textSecondary = R.string.text_empty_holder_secondary_filtered,
-			actionStringRes = R.string.reset_filter,
-		)
-	} else {
-		EmptyState(
-			icon = R.drawable.ic_empty_history,
-			textPrimary = R.string.text_history_holder_primary,
-			textSecondary = R.string.text_history_holder_secondary,
-			actionStringRes = 0,
-		)
-	}
+private fun MangaHistory.header(order: ListSortOrder): ListHeader? = when (order) {
+	ListSortOrder.LAST_READ,
+	ListSortOrder.LONG_AGO_READ -> calculateTimeAgo(updatedAt)?.let {
+		ListHeader(it)
+	} ?: ListHeader(R.string.unknown)
+
+	ListSortOrder.OLDEST,
+	ListSortOrder.NEWEST -> calculateTimeAgo(createdAt)?.let {
+		ListHeader(it)
+	} ?: ListHeader(R.string.unknown)
+
+	ListSortOrder.UNREAD,
+	ListSortOrder.PROGRESS -> ListHeader(
+		when {
+			ReadingProgress.isCompleted(percent) -> R.string.status_completed
+			percent in 0f..0.01f -> R.string.status_planned
+			percent in 0f..1f -> R.string.status_reading
+			else -> R.string.unknown
+		},
+	)
+
+	ListSortOrder.ALPHABETIC,
+	ListSortOrder.ALPHABETIC_REVERSE,
+	ListSortOrder.RELEVANCE,
+	ListSortOrder.NEW_CHAPTERS,
+	ListSortOrder.UPDATED,
+	ListSortOrder.RATING -> null
+}
+
+private fun historyEmptyState(hasFilters: Boolean) = if (hasFilters) {
+	EmptyState(
+		icon = R.drawable.ic_empty_history,
+		textPrimary = R.string.nothing_found,
+		textSecondary = R.string.text_empty_holder_secondary_filtered,
+		actionStringRes = R.string.reset_filter,
+	)
+} else {
+	EmptyState(
+		icon = R.drawable.ic_empty_history,
+		textPrimary = R.string.text_history_holder_primary,
+		textSecondary = R.string.text_history_holder_secondary,
+		actionStringRes = 0,
+	)
 }

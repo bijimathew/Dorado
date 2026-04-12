@@ -268,6 +268,43 @@
 			android:name="org.koitharu.kotatsu.settings.sources.catalog.SourcesCatalogActivity"
 			android:label="@string/sources_catalog" />
 		<activity
+			android:name="org.koitharu.kotatsu.settings.sources.repo.MihonExtensionReposActivity"
+			android:exported="true"
+			android:label="@string/extension_repositories">
+			<intent-filter>
+				<action android:name="android.intent.action.SEND" />
+
+				<category android:name="android.intent.category.DEFAULT" />
+
+				<data android:mimeType="text/plain" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+
+				<data
+					android:host="keiyoushi.github.io"
+					android:path="/add-repo"
+					android:scheme="https" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+
+				<data
+					android:host="raw.githubusercontent.com"
+					android:path="/keiyoushi/extensions/repo/index.min.json"
+					android:scheme="https" />
+			</intent-filter>
+		</activity>
+		<activity
+			android:name="org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity"
+			android:label="@string/extensions" />
+		<activity
 			android:name="org.koitharu.kotatsu.scrobbling.kitsu.ui.KitsuAuthActivity"
 			android:exported="false"
 			android:label="@string/kitsu"

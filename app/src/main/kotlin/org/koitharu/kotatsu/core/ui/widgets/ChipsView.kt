@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.text.buildSpannedString
 import androidx.core.text.inSpans
 import androidx.core.view.children
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import coil3.ImageLoader
 import coil3.request.Disposable
@@ -32,6 +33,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.ui.image.ChipIconTarget
 import org.koitharu.kotatsu.core.util.ext.enqueueWith
+import org.koitharu.kotatsu.core.util.ext.findActivity
 import org.koitharu.kotatsu.core.util.ext.getThemeColor
 import org.koitharu.kotatsu.core.util.ext.setProgressIcon
 import org.koitharu.kotatsu.parsers.util.ifZero
@@ -141,6 +143,7 @@ class ChipsView @JvmOverloads constructor(
 
 		private var model: ChipModel? = null
 		private var imageRequest: Disposable? = null
+		private var reloadIconOnAttach = false
 
 		private val defaultStrokeColor = chipStrokeColor
 		private val defaultTextColor = textColors
@@ -219,6 +222,26 @@ class ChipsView @JvmOverloads constructor(
 
 		override fun toggle() = Unit
 
+		override fun onAttachedToWindow() {
+			super.onAttachedToWindow()
+			if (reloadIconOnAttach) {
+				reloadIconOnAttach = false
+				model?.let(::bindIcon)
+			}
+		}
+
+		override fun onDetachedFromWindow() {
+			reloadIconOnAttach = imageRequest?.job?.isActive == true
+			imageRequest?.dispose()
+			imageRequest = null
+			val lifecycleState = findViewTreeLifecycleOwner()?.lifecycle?.currentState
+			if (lifecycleState == Lifecycle.State.DESTROYED || context.findActivity()?.isDestroyed == true) {
+				reloadIconOnAttach = false
+				disposeIcon()
+			}
+			super.onDetachedFromWindow()
+		}
+
 		private fun bindIcon(model: ChipModel) {
 			when {
 				model.isChecked -> disposeIcon()
@@ -226,6 +249,7 @@ class ChipsView @JvmOverloads constructor(
 				model.isLoading -> {
 					imageRequest?.dispose()
 					imageRequest = null
+					reloadIconOnAttach = false
 					isChipIconVisible = true
 					setProgressIcon()
 				}
@@ -233,8 +257,9 @@ class ChipsView @JvmOverloads constructor(
 				!iconsVisible -> disposeIcon()
 
 				model.iconData != null -> {
+					imageRequest?.dispose()
 					val placeholder = model.icon.ifZero { materialR.drawable.navigation_empty_icon }
-					imageRequest = ImageRequest.Builder(context)
+					imageRequest = ImageRequest.Builder(context.applicationContext)
 						.data(model.iconData)
 						.crossfade(false)
 						.size(resources.getDimensionPixelSize(materialR.dimen.m3_chip_icon_size))
@@ -246,12 +271,14 @@ class ChipsView @JvmOverloads constructor(
 						.transformations(RoundedCornersTransformation(resources.getDimension(R.dimen.chip_icon_corner)))
 						.allowRgb565(true)
 						.enqueueWith(coil)
+					reloadIconOnAttach = false
 					isChipIconVisible = true
 				}
 
 				model.icon != 0 -> {
 					imageRequest?.dispose()
 					imageRequest = null
+					reloadIconOnAttach = false
 					setChipIconResource(model.icon)
 					isChipIconVisible = true
 				}
@@ -263,6 +290,7 @@ class ChipsView @JvmOverloads constructor(
 		private fun disposeIcon() {
 			imageRequest?.dispose()
 			imageRequest = null
+			reloadIconOnAttach = false
 			chipIcon = null
 			isChipIconVisible = false
 		}

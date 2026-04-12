@@ -3,6 +3,11 @@
 	xmlns:android="http://schemas.android.com/apk/res/android">
 
 	<item
+		android:id="@+id/action_add_mihon_sources"
+		android:title="@string/add_mihon_sources_from_link"
+		android:titleCondensed="@string/add" />
+
+	<item
 		android:id="@+id/action_manage"
 		android:title="@string/manage_sources"
 		android:titleCondensed="@string/manage" />

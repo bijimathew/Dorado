@@ -1,9 +1,7 @@
 package org.koitharu.kotatsu.core.parser.mihon
 
 import android.content.Context
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -11,6 +9,7 @@ import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 import eu.kanade.tachiyomi.source.online.HttpSource
 import org.koitharu.kotatsu.BuildConfig
+import org.koitharu.kotatsu.core.parser.mihon.repo.MihonPrivateExtensionStore
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,6 +17,7 @@ import javax.inject.Singleton
 class MihonExtensionManager @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val injektBridge: dagger.Lazy<MihonInjektBridge>,
+	private val privateExtensionStore: MihonPrivateExtensionStore,
 ) {
 
 	data class LoadedSource(
@@ -53,44 +53,80 @@ class MihonExtensionManager @Inject constructor(
 
 	private fun loadInstalledSources(): List<LoadedSource> {
 		val pm = context.packageManager
-		val installedPackages = getInstalledPackages(pm)
-		Log.w(TAG, "Scanning ${installedPackages.size} installed packages for Mihon extensions")
-		return installedPackages
-			.asSequence()
-			.filter { pkgInfo ->
-				val isExtension = isMihonExtension(pkgInfo)
+		val extensionPackages = (
+			MihonExtensionPackageUtil.getInstalledPackages(pm)
+				.asSequence()
+				.map { MihonInstalledExtensionPackage(it, isPrivate = false) } +
+			privateExtensionStore.listInstalledPackages()
+				.asSequence()
+				.map { MihonInstalledExtensionPackage(it, isPrivate = true) }
+			)
+			.filter { extensionPackage ->
+				val pkgInfo = if (extensionPackage.isPrivate) {
+					extensionPackage.packageInfo
+				} else {
+					MihonExtensionPackageUtil.refreshPackageInfoIfNeeded(pm, extensionPackage.packageInfo)
+				}
+				val isExtension = MihonExtensionPackageUtil.isMihonExtension(pkgInfo)
 				if (isExtension) {
-					Log.w(TAG, "Found Mihon extension candidate ${pkgInfo.packageName}")
+					Log.w(
+						TAG,
+						"Found ${if (extensionPackage.isPrivate) "private" else "shared"} Mihon extension candidate ${pkgInfo.packageName}",
+					)
 				}
 				isExtension
 			}
+			.groupBy { it.packageInfo.packageName }
+			.mapNotNull { (_, packages) ->
+				MihonExtensionPackageUtil.selectPreferred(
+					shared = packages.firstOrNull { !it.isPrivate },
+					private = packages.firstOrNull { it.isPrivate },
+				)
+			}
+			.toList()
+		Log.w(TAG, "Scanning ${extensionPackages.size} Mihon extension packages")
+		return extensionPackages
+			.asSequence()
 			.flatMap { loadSourcesFromPackage(pm, it).asSequence() }
 			.sortedBy { it.wrapper.displayName?.lowercase() ?: it.wrapper.packageName.lowercase() }
 			.toList()
 	}
 
-	private fun loadSourcesFromPackage(pm: PackageManager, pkgInfo: PackageInfo): List<LoadedSource> {
-		val completeInfo = refreshPackageInfoIfNeeded(pm, pkgInfo)
+	private fun loadSourcesFromPackage(
+		pm: PackageManager,
+		extensionPackage: MihonInstalledExtensionPackage,
+	): List<LoadedSource> {
+		val completeInfo = if (extensionPackage.isPrivate) {
+			extensionPackage.packageInfo
+		} else {
+			MihonExtensionPackageUtil.refreshPackageInfoIfNeeded(pm, extensionPackage.packageInfo)
+		}
 		val appInfo = completeInfo.applicationInfo ?: return emptyList()
 		val metaData = appInfo.metaData ?: return emptyList()
-		val sourceClassName = metaData.getString(METADATA_SOURCE_CLASS)
-			?: metaData.getString(METADATA_SOURCE_FACTORY)
+		val sourceClassName = metaData.getString(MihonExtensionPackageUtil.METADATA_SOURCE_CLASS)
+			?: metaData.getString(MihonExtensionPackageUtil.METADATA_SOURCE_FACTORY)
 			?: return emptyList()
 		val apkPath = appInfo.sourceDir ?: return emptyList()
-		val libVersion = parseLibVersion(completeInfo.versionName)
-		if (libVersion != null && (libVersion < LIB_VERSION_MIN || libVersion > LIB_VERSION_MAX)) {
+		val libVersion = MihonExtensionPackageUtil.parseLibVersion(completeInfo.versionName)
+		if (libVersion != null &&
+			(libVersion < MihonExtensionPackageUtil.LIB_VERSION_MIN ||
+				libVersion > MihonExtensionPackageUtil.LIB_VERSION_MAX)
+		) {
 			Log.i(TAG, "Skipping ${completeInfo.packageName}: unsupported lib version $libVersion")
 			return emptyList()
 		}
 		return runCatching {
-			Log.w(TAG, "Loading Mihon extension package ${completeInfo.packageName} from $apkPath")
+			Log.w(
+				TAG,
+				"Loading ${if (extensionPackage.isPrivate) "private" else "shared"} Mihon extension package ${completeInfo.packageName} from $apkPath",
+			)
 			val loader = ChildFirstPathClassLoader(
 				dexPath = apkPath,
 				librarySearchPath = appInfo.nativeLibraryDir,
 				parent = context.classLoader,
 			)
 			val loadedClass = Class.forName(
-				resolveEntryClassName(completeInfo.packageName, sourceClassName),
+				MihonExtensionPackageUtil.resolveEntryClassName(completeInfo.packageName, sourceClassName),
 				false,
 				loader,
 			)
@@ -156,82 +192,7 @@ class MihonExtensionManager @Inject constructor(
 		}.getOrDefault(emptyList())
 	}
 
-	private fun isMihonExtension(pkgInfo: PackageInfo): Boolean {
-		val completeInfo = refreshPackageInfoIfNeeded(context.packageManager, pkgInfo)
-		val metaData = completeInfo.applicationInfo?.metaData
-		val hasFeature = completeInfo.reqFeatures?.any { it.name == EXTENSION_FEATURE } == true
-		val hasMetadata = metaData?.containsKey(METADATA_SOURCE_CLASS) == true ||
-			metaData?.containsKey(METADATA_SOURCE_FACTORY) == true
-		val looksLikeExtension = completeInfo.packageName.contains(".extension") ||
-			completeInfo.packageName.startsWith("eu.kanade.tachiyomi.") ||
-			completeInfo.packageName.startsWith("org.keiyoushi.")
-		return hasFeature || (hasMetadata && looksLikeExtension)
-	}
-
-	private fun parseLibVersion(versionName: String?): Double? {
-		versionName ?: return null
-		return runCatching {
-			versionName.split('.').let { parts ->
-				if (parts.size >= 2) {
-					"${parts[0]}.${parts[1]}".toDouble()
-				} else {
-					parts[0].toDouble()
-				}
-			}
-		}.getOrNull()
-	}
-
-	private fun resolveEntryClassName(packageName: String, className: String): String {
-		return if (className.startsWith('.')) {
-			packageName + className
-		} else {
-			className
-		}
-	}
-
-	private fun getInstalledPackages(pm: PackageManager): List<PackageInfo> {
-		return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-			pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(SCAN_FLAGS.toLong()))
-		} else {
-			@Suppress("DEPRECATION")
-			pm.getInstalledPackages(SCAN_FLAGS)
-		}
-	}
-
-	private fun refreshPackageInfoIfNeeded(pm: PackageManager, pkgInfo: PackageInfo): PackageInfo {
-		val needsRefresh = pkgInfo.applicationInfo?.metaData == null || pkgInfo.reqFeatures == null
-		if (!needsRefresh) {
-			return pkgInfo
-		}
-		return getPackageInfoOrNull(pm, pkgInfo.packageName) ?: pkgInfo
-	}
-
-	private fun getPackageInfoOrNull(pm: PackageManager, packageName: String): PackageInfo? {
-		return try {
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-				pm.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(PACKAGE_QUERY_FLAGS.toLong()))
-			} else {
-				@Suppress("DEPRECATION")
-				pm.getPackageInfo(packageName, PACKAGE_QUERY_FLAGS)
-			}
-		} catch (_: PackageManager.NameNotFoundException) {
-			null
-		}
-	}
-
 	companion object {
 		private const val TAG = "MihonExtensionManager"
-		private const val EXTENSION_FEATURE = "tachiyomi.extension"
-		private const val METADATA_SOURCE_CLASS = "tachiyomi.extension.class"
-		private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
-		private const val METADATA_NSFW = "tachiyomi.extension.nsfw"
-		private const val LIB_VERSION_MIN = 1.2
-		private const val LIB_VERSION_MAX = 1.9
-		private val SCAN_FLAGS = PackageManager.GET_META_DATA or PackageManager.GET_CONFIGURATIONS
-		@Suppress("DEPRECATION")
-		private val PACKAGE_QUERY_FLAGS = PackageManager.GET_META_DATA or
-			PackageManager.GET_CONFIGURATIONS or
-			PackageManager.GET_SIGNATURES or
-			(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES else 0)
 	}
 }
