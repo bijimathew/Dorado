@@ -148,6 +148,7 @@ class DetailsActivity :
 		infoBinding.textViewLocal.setOnClickListener(this)
 		infoBinding.textViewSource.setOnClickListener(this)
 		viewBinding.imageViewCover.setOnClickListener(this)
+		viewBinding.backdropClickArea.setOnClickListener(this)
 		viewBinding.textViewTitle.setTextIsSelectable(false)
 		viewBinding.textViewSubtitle.setTextIsSelectable(false)
 		viewBinding.textViewTitle.setOnClickListener(this)
@@ -177,6 +178,7 @@ class DetailsActivity :
 		val appRouter = router
 		viewModel.mangaDetails.filterNotNull().observe(this, ::onMangaUpdated)
 		viewModel.coverUrl.observe(this, ::loadCover)
+		viewModel.backdropUrl.observe(this, ::loadBackdrop)
 		viewModel.onMangaRemoved.observeEvent(this, ::onMangaRemoved)
 		viewModel.onError
 			.filterNot { appRouter.isChapterPagesSheetShown() }
@@ -240,6 +242,16 @@ class DetailsActivity :
 					source = manga.source,
 					preview = CoilMemoryCacheKey.from(viewBinding.imageViewCover),
 					anchor = v,
+				)
+			}
+
+			R.id.backdrop_click_area -> {
+				val manga = viewModel.getMangaOrNull() ?: return
+				router.openImage(
+					url = viewModel.backdropUrl.value ?: return,
+					source = manga.source,
+					preview = CoilMemoryCacheKey.from(viewBinding.backdrop),
+					anchor = viewBinding.backdrop,
 				)
 			}
 
@@ -526,6 +538,12 @@ class DetailsActivity :
 
 	private fun loadCover(imageUrl: String?) {
 		viewBinding.imageViewCover.setImageAsync(imageUrl, viewModel.getMangaOrNull())
+	}
+
+	private fun loadBackdrop(imageUrl: String?) {
+		val isVisible = !imageUrl.isNullOrBlank()
+		viewBinding.backdropContainer.isVisible = isVisible
+		viewBinding.backdrop.setImageAsync(imageUrl, viewModel.getMangaOrNull())
 	}
 
 	private fun showTextDialog(text: String) {

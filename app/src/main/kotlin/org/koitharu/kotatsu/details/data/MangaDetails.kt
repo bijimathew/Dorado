@@ -51,6 +51,13 @@ data class MangaDetails(
             .ifNullOrEmpty { localManga?.manga?.coverUrl }
             ?.nullIfEmpty()
 
+    val backdropUrl: String?
+        get() = override?.coverUrl
+            .ifNullOrEmpty { manga.largeCoverUrl }
+            .ifNullOrEmpty { manga.coverUrl }
+            .ifNullOrEmpty { localManga?.manga?.coverUrl }
+            ?.nullIfEmpty()
+
     val isRestricted: Boolean
         get() = manga.state == MangaState.RESTRICTED
 

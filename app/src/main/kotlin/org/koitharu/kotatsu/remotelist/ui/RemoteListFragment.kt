@@ -18,7 +18,6 @@ import org.koitharu.kotatsu.core.ui.list.ListSelectionController
 import org.koitharu.kotatsu.core.ui.util.MenuInvalidator
 import org.koitharu.kotatsu.core.util.ext.addMenuProvider
 import org.koitharu.kotatsu.core.util.ext.getCauseUrl
-import org.koitharu.kotatsu.core.util.ext.isHttpUrl
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
 import org.koitharu.kotatsu.core.util.ext.withArgs
@@ -91,9 +90,14 @@ class RemoteListFragment : MangaListFragment(), FilterCoordinator.Owner, View.On
     override fun onClick(v: View?) = Unit // from Snackbar, do nothing
 
     private fun openInBrowser(url: String?) {
-        if (url?.isHttpUrl() == true) {
+        val normalizedUrl = when {
+            url.isNullOrEmpty() -> null
+            url.startsWith("//") -> "https:$url"
+            else -> url
+        }
+        if (!normalizedUrl.isNullOrEmpty()) {
             router.openBrowser(
-                url = url,
+                url = normalizedUrl,
                 source = viewModel.source,
                 title = viewModel.source.getTitle(requireContext()),
             )

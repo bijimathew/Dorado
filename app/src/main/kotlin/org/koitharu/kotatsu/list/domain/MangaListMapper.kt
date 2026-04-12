@@ -145,6 +145,7 @@ class MangaListMapper @Inject constructor(
 		manga: Manga,
 		override: MangaOverride?,
 		badges: MangaBadges,
+		isTitleHidden: Boolean = false,
 	) = MangaGridModel(
 		manga = manga,
 		override = override,
@@ -152,6 +153,7 @@ class MangaListMapper @Inject constructor(
 		progress = badges.progress,
 		isFavorite = badges.isFavorite,
 		isSaved = badges.isSaved,
+		isTitleHidden = isTitleHidden,
 	)
 
 	private fun toListModelImpl(
@@ -163,6 +165,7 @@ class MangaListMapper @Inject constructor(
 		ListMode.LIST -> toCompactListModel(manga, override, badges)
 		ListMode.DETAILED_LIST -> toDetailedListModel(manga, override, badges)
 		ListMode.GRID -> toGridModel(manga, override, badges)
+		ListMode.COVER_ONLY -> toGridModel(manga, override, badges, isTitleHidden = true)
 	}
 
 	private suspend fun loadBadges(ids: Set<Long>, @Options options: Int): Map<Long, MangaBadges> {

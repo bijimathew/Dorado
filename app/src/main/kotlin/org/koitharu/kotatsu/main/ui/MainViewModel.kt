@@ -15,7 +15,6 @@ import org.koitharu.kotatsu.core.prefs.observeAsStateFlow
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
-import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.history.data.HistoryRepository
 import org.koitharu.kotatsu.main.domain.ReadingResumeEnabledUseCase
 import org.koitharu.kotatsu.parsers.model.Manga
@@ -29,7 +28,6 @@ class MainViewModel @Inject constructor(
 	trackingRepository: TrackingRepository,
 	private val settings: AppSettings,
 	readingResumeEnabledUseCase: ReadingResumeEnabledUseCase,
-	private val sourcesRepository: MangaSourcesRepository,
 ) : BaseViewModel() {
 
 	val onOpenReader = MutableEventFlow<Manga>()
@@ -65,8 +63,9 @@ class MainViewModel @Inject constructor(
 		launchJob {
 			appUpdateRepository.fetchUpdate()
 		}
-		launchJob(Dispatchers.Default) {
-			if (sourcesRepository.isSetupRequired()) {
+		launchJob {
+			if (settings.isFirstLaunch) {
+				settings.isFirstLaunch = false
 				onFirstStart.call(Unit)
 			}
 		}

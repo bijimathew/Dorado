@@ -52,6 +52,10 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	private val connectivityManager = context.connectivityManager
 	private val mangaListBadgesDefault = ArraySet(context.resources.getStringArray(R.array.values_list_badges))
 
+	var isFirstLaunch: Boolean
+		get() = prefs.getBoolean(KEY_FIRST_LAUNCH, true)
+		set(value) = prefs.edit { putBoolean(KEY_FIRST_LAUNCH, value) }
+
 	var listMode: ListMode
 		get() = prefs.getEnumValue(KEY_LIST_MODE, ListMode.GRID)
 		set(value) = prefs.edit { putEnumValue(KEY_LIST_MODE, value) }
@@ -812,6 +816,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_STATS_ENABLED = "stats_on"
 		const val KEY_FEED_HEADER = "feed_header"
 		const val KEY_SEARCH_SUGGESTION_TYPES = "search_suggest_types"
+		const val KEY_FIRST_LAUNCH = "first_launch"
 		const val KEY_SOURCES_VERSION = "sources_version"
 		const val KEY_SOURCES_ENABLED_ALL = "sources_enabled_all"
 		const val KEY_SOURCES_HIDE_BROKEN = "sources_hide_broken"

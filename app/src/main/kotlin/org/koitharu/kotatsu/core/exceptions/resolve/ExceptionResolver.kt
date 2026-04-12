@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.browser.BrowserActivity
 import org.koitharu.kotatsu.browser.cloudflare.CloudFlareActivity
@@ -36,13 +37,13 @@ import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.scrobbling.common.domain.ScrobblerAuthRequiredException
 import org.koitharu.kotatsu.scrobbling.common.ui.ScrobblerAuthHelper
 import org.koitharu.kotatsu.settings.sources.auth.SourceAuthActivity
+import org.koitharu.kotatsu.parsers.exception.ParseException
 import java.security.cert.CertPathValidatorException
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.net.ssl.SSLException
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 class ExceptionResolver private constructor(
     private val host: Host,
@@ -87,6 +88,11 @@ class ExceptionResolver private constructor(
                 false
             }
 
+            is ParseException -> {
+                openInBrowser(e.url)
+                false
+            }
+
             is EmptyMangaException -> {
                 when (e.reason) {
                     EmptyMangaReason.NO_CHAPTERS -> openAlternatives(e.manga)
@@ -120,12 +126,12 @@ class ExceptionResolver private constructor(
 
     private suspend fun resolveBrowserAction(
         e: InteractiveActionRequiredException
-    ): Boolean = suspendCoroutine { cont ->
+    ): Boolean = suspendCancellableCoroutine { cont ->
         continuations[BrowserActivity.TAG] = cont
         browserActionContract.launch(e)
     }
 
-    private suspend fun resolveCF(e: CloudFlareProtectedException): Boolean = suspendCoroutine { cont ->
+    private suspend fun resolveCF(e: CloudFlareProtectedException): Boolean = suspendCancellableCoroutine { cont ->
         continuations[CloudFlareActivity.TAG] = cont
         cloudflareContract.launch(e)
     }
@@ -137,14 +143,19 @@ class ExceptionResolver private constructor(
             }
             return false
         }
-        return suspendCoroutine { cont ->
+        return suspendCancellableCoroutine { cont ->
             continuations[SourceAuthActivity.TAG] = cont
             sourceAuthContract.launch(source)
         }
     }
 
     private fun openInBrowser(url: String) {
-        host.router.openBrowser(url, null, null)
+        val normalizedUrl = when {
+            url.startsWith("//") -> "https:$url"
+            url.isHttpUrl() -> url
+            else -> return
+        }
+        host.router.openBrowser(normalizedUrl, null, null)
     }
 
     private fun openAlternatives(manga: Manga) {
@@ -242,7 +253,8 @@ class ExceptionResolver private constructor(
             is ScrobblerAuthRequiredException,
             is AuthRequiredException -> R.string.sign_in
 
-            is NotFoundException -> if (e.url.isHttpUrl()) R.string.open_in_browser else 0
+            is NotFoundException -> if (e.url.isHttpUrl() || e.url.startsWith("//")) R.string.open_in_browser else 0
+            is ParseException -> if (e.url.isHttpUrl() || e.url.startsWith("//")) R.string.open_in_browser else 0
             is UnsupportedSourceException -> if (e.manga != null) R.string.alternatives else 0
             is SSLException,
             is CertPathValidatorException -> R.string.fix
