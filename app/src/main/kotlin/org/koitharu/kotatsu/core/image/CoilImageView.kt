@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import androidx.annotation.AttrRes
 import androidx.annotation.DrawableRes
 import androidx.core.content.withStyledAttributes
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
@@ -31,11 +32,13 @@ import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.os.NetworkState
 import org.koitharu.kotatsu.core.util.ext.decodeRegion
+import org.koitharu.kotatsu.core.util.ext.findActivity
 import org.koitharu.kotatsu.core.util.ext.getAnimationDuration
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
 import org.koitharu.kotatsu.core.util.ext.isNetworkError
 import org.koitharu.kotatsu.core.util.ext.mangaSourceExtra
 import org.koitharu.kotatsu.reader.ui.pager.ReaderPage
+import java.lang.ref.WeakReference
 import java.util.LinkedList
 import javax.inject.Inject
 
@@ -65,6 +68,7 @@ open class CoilImageView @JvmOverloads constructor(
 	private var currentRequest: Disposable? = null
 	private var currentImageData: Any = NullRequestData
 	private var networkWaitingJob: Job? = null
+	private val weakRequestListener = WeakImageRequestListener(this)
 
 	private var listeners: MutableList<ImageRequest.Listener>? = null
 
@@ -141,6 +145,7 @@ open class CoilImageView @JvmOverloads constructor(
 	fun disposeImage() {
 		networkWaitingJob?.cancel()
 		networkWaitingJob = null
+		currentRequest?.dispose()
 		CoilUtils.dispose(this)
 		currentRequest = null
 		currentImageData = NullRequestData
@@ -160,12 +165,16 @@ open class CoilImageView @JvmOverloads constructor(
 		}
 		networkWaitingJob?.cancel()
 		networkWaitingJob = null
+		previous?.dispose()
 		currentImageData = request.data
 		return coil.enqueue(request).also { currentRequest = it }
 	}
 
-	protected open fun newRequestBuilder() = ImageRequest.Builder(context).apply {
-		lifecycle(findViewTreeLifecycleOwner())
+	protected open val imageRequestContext: Context
+		get() = context
+
+	protected open fun newRequestBuilder() = ImageRequest.Builder(imageRequestContext).apply {
+		(findViewTreeLifecycleOwner() ?: (context.findActivity() as? LifecycleOwner))?.let(::lifecycle)
 		val crossfadeDuration = if (context.isAnimationsEnabled) {
 			(context.getAnimationDuration(R.integer.config_defaultAnimTime) * crossfadeDurationFactor).toInt()
 		} else {
@@ -193,7 +202,7 @@ open class CoilImageView @JvmOverloads constructor(
 			} ?: ViewSizeResolver(this@CoilImageView),
 		)
 		scale(scaleType.toCoilScale())
-		listener(this@CoilImageView)
+		listener(weakRequestListener)
 		allowRgb565(allowRgb565)
 		target(this@CoilImageView)
 	}
@@ -220,6 +229,29 @@ open class CoilImageView @JvmOverloads constructor(
 			if (isFailed) {
 				reload()
 			}
+		}
+	}
+
+	private class WeakImageRequestListener(
+		view: CoilImageView,
+	) : ImageRequest.Listener {
+
+		private val viewRef = WeakReference(view)
+
+		override fun onCancel(request: ImageRequest) {
+			viewRef.get()?.onCancel(request)
+		}
+
+		override fun onError(request: ImageRequest, result: ErrorResult) {
+			viewRef.get()?.onError(request, result)
+		}
+
+		override fun onStart(request: ImageRequest) {
+			viewRef.get()?.onStart(request)
+		}
+
+		override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+			viewRef.get()?.onSuccess(request, result)
 		}
 	}
 }

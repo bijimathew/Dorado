@@ -13,9 +13,9 @@ import coil3.request.ImageRequest
 import com.google.android.material.animation.ArgbEvaluatorCompat
 import com.google.android.material.color.MaterialColors
 import org.koitharu.kotatsu.R
-import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.util.ext.getAnimationDuration
 import org.koitharu.kotatsu.core.util.ext.mangaSourceKey
+import org.koitharu.kotatsu.parsers.model.MangaSource
 import kotlin.math.abs
 
 class AnimatedFaviconDrawable(
@@ -84,10 +84,9 @@ class AnimatedFaviconDrawable(
 	) : ((ImageRequest) -> Image?) {
 
 		override fun invoke(request: ImageRequest): Image? {
-			val source = request.getExtra(mangaSourceKey) ?: return null
+			val source = request.getExtra(mangaSourceKey) as? MangaSource ?: return null
 			val context = request.context
-			val title = source.getTitle(context)
-			return AnimatedFaviconDrawable(context, styleResId, title).asImage()
+			return AnimatedFaviconDrawable(context, styleResId, source.name).asImage()
 		}
 	}
 }

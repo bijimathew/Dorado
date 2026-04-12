@@ -33,6 +33,7 @@ import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.util.MimeTypes
+import org.koitharu.kotatsu.core.util.ext.faviconCacheOnlyKey
 import org.koitharu.kotatsu.core.util.ext.fetch
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toMimeTypeOrNull
@@ -54,6 +55,7 @@ class FaviconFetcher(
 
 	override suspend fun fetch(): FetchResult? {
 		val mangaSource = MangaSource(uri.schemeSpecificPart)
+		val isCacheOnly = options.extras[faviconCacheOnlyKey] == true
 
 		return when (val repo = mangaRepositoryFactory.create(mangaSource)) {
 			is ParserMangaRepository -> fetchParserFavicon(repo)
@@ -66,7 +68,11 @@ class FaviconFetcher(
 
 			is LocalMangaRepository -> imageLoader.fetch(R.drawable.ic_storage, options)
 
-			else -> throw IllegalArgumentException("Unsupported repo ${repo.javaClass.simpleName}")
+			else -> if (isCacheOnly) {
+				throw NoSuchElementException("No cached favicon for ${repo.javaClass.simpleName}")
+			} else {
+				throw IllegalArgumentException("Unsupported repo ${repo.javaClass.simpleName}")
+			}
 		}
 	}
 
@@ -84,6 +90,9 @@ class FaviconFetcher(
 					dataSource = DataSource.DISK,
 				)
 			}
+		}
+		if (options.extras[faviconCacheOnlyKey] == true) {
+			throw NoSuchElementException("No cached favicon for ${repository.source.name}")
 		}
 		var favicons = repository.getFavicons()
 		var lastError: Exception? = null
@@ -192,4 +201,3 @@ class FaviconFetcher(
 
 	}
 }
-

@@ -19,10 +19,10 @@ import coil3.getExtra
 import coil3.request.ImageRequest
 import com.google.android.material.color.MaterialColors
 import org.koitharu.kotatsu.R
-import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.util.KotatsuColors
 import org.koitharu.kotatsu.core.util.ext.hasFocusStateSpecified
 import org.koitharu.kotatsu.core.util.ext.mangaSourceKey
+import org.koitharu.kotatsu.parsers.model.MangaSource
 
 open class FaviconDrawable(
 	context: Context,
@@ -136,10 +136,9 @@ open class FaviconDrawable(
 	) : ((ImageRequest) -> Image?) {
 
 		override fun invoke(request: ImageRequest): Image? {
-			val source = request.getExtra(mangaSourceKey) ?: return null
+			val source = request.getExtra(mangaSourceKey) as? MangaSource ?: return null
 			val context = request.context
-			val title = source.getTitle(context)
-			return FaviconDrawable(context, styleResId, title).asImage()
+			return FaviconDrawable(context, styleResId, source.name).asImage()
 		}
 	}
 }

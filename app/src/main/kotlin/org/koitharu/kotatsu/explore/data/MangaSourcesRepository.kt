@@ -32,6 +32,7 @@ import org.koitharu.kotatsu.core.model.isNsfw
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
 import org.koitharu.kotatsu.core.parser.mihon.MihonExtensionManager
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
+import org.koitharu.kotatsu.core.parser.mihon.repo.MihonPrivateExtensionStore
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.observeAsFlow
 import org.koitharu.kotatsu.core.ui.util.ReversibleHandle
@@ -58,8 +59,14 @@ class MangaSourcesRepository @Inject constructor(
 
 	data class ParserSourceSnapshot(
 		val source: MangaSource,
+		val title: String,
+		val locale: String?,
+		val contentType: ContentType,
 		val isEnabled: Boolean,
 		val addedIn: Int,
+		val isBroken: Boolean,
+		val isNsfw: Boolean,
+		val isMihon: Boolean,
 	)
 
 	private val isNewSourcesAssimilated = AtomicBoolean(false)
@@ -147,75 +154,55 @@ class MangaSourcesRepository @Inject constructor(
 	): List<MangaSource> {
 		val entries = snapshot ?: getParserSourcesSnapshot()
 		val coroutineContext = currentCoroutineContext()
-		val sources = entries.mapTo(ArrayList(entries.size)) { it.source }
 		val hideBrokenSources = settings.isBrokenSourcesHidden
-		if (settings.isNsfwContentDisabled) {
-			sources.removeAll { it.isNsfw() }
-		}
-		coroutineContext.ensureActive()
-		if (hideBrokenSources) {
-			sources.removeAll { it is MangaParserSource && it.isBroken }
-		}
-		coroutineContext.ensureActive()
-		if (isDisabledOnly && !settings.isAllSourcesEnabled) {
-			val enabledSources = entries.asSequence()
+		val enabledNames = if (isDisabledOnly && !settings.isAllSourcesEnabled) {
+			entries.asSequence()
 				.filter { it.isEnabled }
-				.mapTo(HashSet(entries.size)) { it.source }
-			sources.removeAll(enabledSources)
+				.mapTo(HashSet(entries.size)) { it.source.name }
+		} else {
+			emptySet()
 		}
-		coroutineContext.ensureActive()
-		if (isNewOnly) {
-			val newSources = entries.asSequence()
-				.filter { it.addedIn == BuildConfig.VERSION_CODE }
-				.mapTo(HashSet(entries.size)) { it.source }
-			sources.retainAll(newSources)
-		}
-		coroutineContext.ensureActive()
-		if (locale != null) {
-			sources.retainAll { source ->
-				when (source) {
-					is MangaParserSource -> source.locale == locale
-					is MihonMangaSource -> source.resolved().locale == locale
-					else -> false
-				}
+		val effectiveQuery = query?.takeIf { it.isNotBlank() }
+		val sources = ArrayList<MangaSource>(entries.size)
+		for ((index, entry) in entries.withIndex()) {
+			if (index % 32 == 0) {
+				coroutineContext.ensureActive()
 			}
-		}
-		coroutineContext.ensureActive()
-		if (isMihonOnly) {
-			sources.retainAll { it is MihonMangaSource }
-		}
-		coroutineContext.ensureActive()
-		if (excludeBroken && !hideBrokenSources) {
-			sources.removeAll { it is MangaParserSource && it.isBroken }
-		}
-		coroutineContext.ensureActive()
-		if (types.isNotEmpty()) {
-			sources.retainAll { source ->
-				when (source) {
-					is MangaParserSource -> source.contentType in types
-					is MihonMangaSource -> ContentType.MANGA in types
-					else -> false
-				}
+			if (settings.isNsfwContentDisabled && entry.isNsfw) {
+				continue
 			}
-		}
-		coroutineContext.ensureActive()
-		if (!query.isNullOrEmpty()) {
-			var checked = 0
-			val iterator = sources.listIterator()
-			while (iterator.hasNext()) {
-				val source = iterator.next()
-				if (!source.getTitle(context).contains(query, ignoreCase = true) &&
-					!source.name.contains(query, ignoreCase = true)
-				) {
-					iterator.remove()
-				}
-				if (++checked % 32 == 0) {
-					coroutineContext.ensureActive()
-				}
+			if (hideBrokenSources && entry.isBroken) {
+				continue
 			}
+			if (isDisabledOnly && !settings.isAllSourcesEnabled && entry.source.name in enabledNames) {
+				continue
+			}
+			if (isNewOnly && entry.addedIn != BuildConfig.VERSION_CODE) {
+				continue
+			}
+			if (locale != null && entry.locale != locale) {
+				continue
+			}
+			if (isMihonOnly && !entry.isMihon) {
+				continue
+			}
+			if (excludeBroken && !hideBrokenSources && entry.isBroken) {
+				continue
+			}
+			if (types.isNotEmpty() && entry.contentType !in types) {
+				continue
+			}
+			if (effectiveQuery != null &&
+				!entry.title.contains(effectiveQuery, ignoreCase = true) &&
+				!entry.source.name.contains(effectiveQuery, ignoreCase = true)
+			) {
+				continue
+			}
+			sources += entry.source
 		}
-		if (sortOrder == SourcesSortOrder.ALPHABETIC) {
-			sources.sortBy { it.getTitle(context) }
+		if (sortOrder != SourcesSortOrder.ALPHABETIC) {
+			// Snapshot order is pre-sorted alphabetically for catalog use.
+			return sources
 		}
 		return sources
 	}
@@ -229,12 +216,27 @@ class MangaSourcesRepository @Inject constructor(
 			if (source is MangaParserSource && source !in allMangaSources) {
 				return@mapNotNull null
 			}
+			val locale = when (source) {
+				is MangaParserSource -> source.locale
+				is MihonMangaSource -> source.resolved().locale
+				else -> null
+			}
 			ParserSourceSnapshot(
 				source = source,
+				title = source.getTitle(context),
+				locale = locale,
+				contentType = when (source) {
+					is MangaParserSource -> source.contentType
+					is MihonMangaSource -> ContentType.MANGA
+					else -> ContentType.OTHER
+				},
 				isEnabled = entity.isEnabled,
 				addedIn = entity.addedIn,
+				isBroken = source is MangaParserSource && source.isBroken,
+				isNsfw = source.isNsfw(),
+				isMihon = source is MihonMangaSource,
 			)
-		}
+		}.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
 	}
 
 	fun observeIsEnabled(source: MangaSource): Flow<Boolean> {
@@ -561,11 +563,19 @@ class MangaSourcesRepository @Inject constructor(
 				},
 				ContextCompat.RECEIVER_EXPORTED,
 			)
+			ContextCompat.registerReceiver(
+				context,
+				receiver,
+				IntentFilter(MihonPrivateExtensionStore.ACTION_PRIVATE_EXTENSIONS_CHANGED),
+				ContextCompat.RECEIVER_EXPORTED,
+			)
 			awaitClose { context.unregisterReceiver(receiver) }
 		}.onStart {
 			emit(null)
 		}.map {
-			mihonExtensionManager.invalidate()
+			if (it != null) {
+				mihonExtensionManager.invalidate()
+			}
 			getMihonSources()
 		}.distinctUntilChanged()
 			.conflate()

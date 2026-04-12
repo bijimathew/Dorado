@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.core.graphics.Insets
+import androidx.core.view.children
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.Lifecycle
@@ -19,6 +20,7 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.titleResId
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.BaseActivity
+import org.koitharu.kotatsu.core.image.CoilImageView
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
 import org.koitharu.kotatsu.core.ui.util.FadingAppbarMediator
 import org.koitharu.kotatsu.core.ui.util.ReversibleActionObserver
@@ -67,6 +69,17 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 			updateFilers(it.first, it.second, it.third)
 		}
 		addMenuProvider(SourcesCatalogMenuProvider(this, viewModel, this))
+	}
+
+	override fun onDestroy() {
+		if (hasViewBinding()) {
+			viewBinding.recyclerView.children.forEach { child ->
+				child.findViewById<CoilImageView?>(R.id.imageView_icon)?.disposeImage()
+			}
+			viewBinding.recyclerView.adapter = null
+			viewBinding.chipsFilter.onChipClickListener = null
+		}
+		super.onDestroy()
 	}
 
 	override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {

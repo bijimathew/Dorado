@@ -4,13 +4,13 @@ import androidx.collection.LongSet
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.mapLatest
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.plus
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.MangaSourceInfo
@@ -23,6 +23,7 @@ import org.koitharu.kotatsu.core.ui.util.ReversibleAction
 import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.combine
+import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
 import org.koitharu.kotatsu.explore.domain.ExploreRepository
 import org.koitharu.kotatsu.explore.ui.model.ExploreButtons
@@ -35,7 +36,6 @@ import org.koitharu.kotatsu.list.ui.model.LoadingState
 import org.koitharu.kotatsu.list.ui.model.MangaCompactListModel
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaSource
-import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.suggestions.domain.SuggestionRepository
 import javax.inject.Inject
 
@@ -69,25 +69,28 @@ class ExploreViewModel @Inject constructor(
 	val onActionDone = MutableEventFlow<ReversibleAction>()
 	val onShowSuggestionsTip = MutableEventFlow<Unit>()
 	private val isRandomLoading = MutableStateFlow(false)
+	private val mutableContent = MutableStateFlow(buildExploreLoadingStateList(isRandomLoading.value))
+	private var contentJob: Job? = null
 
-	val content: StateFlow<List<ListModel>> = isLoading.flatMapLatest { loading ->
-		if (loading) {
-			flowOf(getLoadingStateList())
-		} else {
-			createContentFlow()
-		}
-	}.stateIn(
-		viewModelScope + Dispatchers.Default,
-		SharingStarted.WhileSubscribed(CONTENT_STOP_TIMEOUT_MS),
-		getLoadingStateList(),
-	)
+	val content: StateFlow<List<ListModel>> = mutableContent
 
 	init {
-		launchJob(Dispatchers.Default) {
-			if (!settings.isSuggestionsEnabled && settings.isTipEnabled(TIP_SUGGESTIONS)) {
-				onShowSuggestionsTip.call(Unit)
-			}
+		if (shouldShowSuggestionsTip(settings)) {
+			onShowSuggestionsTip.call(Unit)
 		}
+		val loading = isLoading
+		val contentFlow = createContentFlow()
+		val randomLoading = isRandomLoading
+		val contentState = mutableContent
+		contentJob = launchJob(Dispatchers.Default) {
+			collectExploreContent(loading, contentFlow, randomLoading, contentState)
+		}
+	}
+
+	override fun onCleared() {
+		contentJob?.cancel()
+		contentJob = null
+		super.onCleared()
 	}
 
 	fun openRandom() {
@@ -142,70 +145,17 @@ class ExploreViewModel @Inject constructor(
 		}
 	}
 
-	private fun createContentFlow() = combine(
-		sourcesRepository.observeEnabledSources(),
-		getSuggestionFlow(),
-		isGrid,
-		isRandomLoading,
-		isAllSourcesEnabled,
-		sourcesRepository.observeHasNewSourcesForBadge(),
-	) { content, suggestions, grid, randomLoading, allSourcesEnabled, newSources ->
-		buildList(content, suggestions, grid, randomLoading, allSourcesEnabled, newSources)
-	}.withErrorHandling()
-
-	private fun buildList(
-		sources: List<MangaSourceInfo>,
-		recommendation: List<Manga>,
-		isGrid: Boolean,
-		randomLoading: Boolean,
-		allSourcesEnabled: Boolean,
-		hasNewSources: Boolean,
-	): List<ListModel> {
-		val result = ArrayList<ListModel>(sources.size + 3)
-		result += ExploreButtons(randomLoading)
-		if (recommendation.isNotEmpty()) {
-			result += ListHeader(R.string.suggestions, R.string.more, R.id.nav_suggestions)
-			result += RecommendationsItem(recommendation.toRecommendationList())
-		}
-		if (sources.isNotEmpty()) {
-			result += ListHeader(
-				textRes = R.string.remote_sources,
-				buttonTextRes = if (allSourcesEnabled) R.string.manage else R.string.catalog,
-				badge = if (!allSourcesEnabled && hasNewSources) "" else null,
-			)
-			sources.mapTo(result) { MangaSourceItem(it, isGrid) }
-		} else {
-			result += EmptyHint(
-				icon = R.drawable.ic_empty_common,
-				textPrimary = R.string.no_manga_sources,
-				textSecondary = R.string.no_manga_sources_text,
-				actionStringRes = R.string.catalog,
-			)
-		}
-		return result
-	}
-
-	private fun getLoadingStateList() = listOf(
-		ExploreButtons(isRandomLoading.value),
-		LoadingState,
-	)
-
-	private fun getSuggestionFlow() = isSuggestionsEnabled.mapLatest { isEnabled ->
-		if (isEnabled) {
-			runCatchingCancellable {
-				suggestionRepository.getRandomList(SUGGESTIONS_COUNT)
-			}.getOrDefault(emptyList())
-		} else {
-			emptyList()
-		}
-	}
-
-	private fun List<Manga>.toRecommendationList() = map { manga ->
-		MangaCompactListModel(
-			manga = manga,
-			override = null,
-			subtitle = manga.tags.joinToString { it.title },
-			counter = 0,
+	private fun createContentFlow(): Flow<List<ListModel>> {
+		return createExploreContentFlow(
+			enabledSources = sourcesRepository.observeEnabledSources(),
+			isSuggestionsEnabled = isSuggestionsEnabled,
+			suggestionRepository = suggestionRepository,
+			suggestionsCount = SUGGESTIONS_COUNT,
+			isGrid = isGrid,
+			isRandomLoading = isRandomLoading,
+			isAllSourcesEnabled = isAllSourcesEnabled,
+			hasNewSources = sourcesRepository.observeHasNewSourcesForBadge(),
+			onError = errorEvent,
 		)
 	}
 
@@ -213,6 +163,113 @@ class ExploreViewModel @Inject constructor(
 
 		private const val TIP_SUGGESTIONS = "suggestions"
 		private const val SUGGESTIONS_COUNT = 8
-		private const val CONTENT_STOP_TIMEOUT_MS = 5000L
 	}
+}
+
+private fun buildExploreContentList(
+	sources: List<MangaSourceInfo>,
+	recommendation: List<Manga>,
+	isGrid: Boolean,
+	randomLoading: Boolean,
+	allSourcesEnabled: Boolean,
+	hasNewSources: Boolean,
+): List<ListModel> {
+	val result = ArrayList<ListModel>(sources.size + 3)
+	result += ExploreButtons(randomLoading)
+	if (recommendation.isNotEmpty()) {
+		result += ListHeader(R.string.suggestions, R.string.more, R.id.nav_suggestions)
+		result += RecommendationsItem(recommendation.toRecommendationList())
+	}
+	if (sources.isNotEmpty()) {
+		result += ListHeader(
+			textRes = R.string.remote_sources,
+			buttonTextRes = if (allSourcesEnabled) R.string.manage else R.string.catalog,
+			badge = if (!allSourcesEnabled && hasNewSources) "" else null,
+		)
+		sources.mapTo(result) { MangaSourceItem(it, isGrid) }
+	} else {
+		result += EmptyHint(
+			icon = R.drawable.ic_empty_common,
+			textPrimary = R.string.no_manga_sources,
+			textSecondary = R.string.no_manga_sources_text,
+			actionStringRes = R.string.catalog,
+		)
+	}
+	return result
+}
+
+private fun buildExploreLoadingStateList(randomLoading: Boolean) = listOf(
+	ExploreButtons(randomLoading),
+	LoadingState,
+)
+
+private fun shouldShowSuggestionsTip(settings: AppSettings): Boolean {
+	return !settings.isSuggestionsEnabled && settings.isTipEnabled("suggestions")
+}
+
+private fun createExploreContentFlow(
+	enabledSources: Flow<List<MangaSourceInfo>>,
+	isSuggestionsEnabled: Flow<Boolean>,
+	suggestionRepository: SuggestionRepository,
+	suggestionsCount: Int,
+	isGrid: Flow<Boolean>,
+	isRandomLoading: Flow<Boolean>,
+	isAllSourcesEnabled: Flow<Boolean>,
+	hasNewSources: Flow<Boolean>,
+	onError: MutableEventFlow<Throwable>,
+): Flow<List<ListModel>> = combine(
+	enabledSources,
+	observeExploreSuggestions(isSuggestionsEnabled, suggestionRepository, suggestionsCount),
+	isGrid,
+	isRandomLoading,
+	isAllSourcesEnabled,
+	hasNewSources,
+	::buildExploreContentList,
+).catch { error ->
+	error.printStackTraceDebug()
+	onError.call(error)
+}
+
+private fun observeExploreSuggestions(
+	isSuggestionsEnabled: Flow<Boolean>,
+	suggestionRepository: SuggestionRepository,
+	suggestionsCount: Int,
+): Flow<List<Manga>> = isSuggestionsEnabled.mapLatest { isEnabled ->
+	if (isEnabled) {
+		runCatching {
+			suggestionRepository.getRandomList(suggestionsCount)
+		}.getOrDefault(emptyList())
+	} else {
+		emptyList()
+	}
+}
+
+private suspend fun collectExploreContent(
+	isLoading: Flow<Boolean>,
+	content: Flow<List<ListModel>>,
+	isRandomLoading: Flow<Boolean>,
+	target: MutableStateFlow<List<ListModel>>,
+) {
+	combine(isLoading, content, isRandomLoading, ::mergeExploreContent).collect {
+		target.value = it
+	}
+}
+
+private fun mergeExploreContent(
+	loading: Boolean,
+	content: List<ListModel>,
+	randomLoading: Boolean,
+): List<ListModel> = if (loading) {
+	buildExploreLoadingStateList(randomLoading)
+} else {
+	content
+}
+
+private fun List<Manga>.toRecommendationList() = map { manga ->
+	MangaCompactListModel(
+		manga = manga,
+		override = null,
+		subtitle = manga.tags.joinToString { it.title },
+		counter = 0,
+	)
 }
