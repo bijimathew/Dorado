@@ -6,7 +6,7 @@
 <div align="center">
 
 **[Kaisoku](https://github.com/glitch-228/Kaisoku) is a free and open-source manga reader for Android with built-in
-online content sources.**
+online content sources and Mihon/Tachiyomi-compatible extension support.**
 
 ![Android 6.0](https://img.shields.io/badge/android-6.0+-brightgreen) [![Sources count](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fglitch-228%2Fkaisoku-parsers%2Frefs%2Fheads%2Fmaster%2F.github%2Fsummary.yaml&query=total&label=manga%20sources&color=%23E9321C)](https://github.com/glitch-228/kaisoku-parsers) [![License](https://img.shields.io/github/license/glitch-228/Kaisoku)](https://github.com/glitch-228/Kaisoku/blob/devel/LICENSE)
 
@@ -15,16 +15,20 @@ online content sources.**
 <div align="left">
 
 * Online [manga catalogues](https://github.com/glitch-228/kaisoku-parsers) (with 1200+ manga sources)
+* Regular source fixes and additions taken from other active forks
+* Mihon/Tachiyomi-compatible extensions, including extension repositories, direct repo-link import from Explore, in-app extension management, and app-private loading without system-wide APK installs
 * Search manga by name, genres and more filters
 * Favorites organized by user-defined categories
 * Reading history, bookmarks and incognito mode support
 * Download manga and read it offline. Third-party CBZ archives are also supported
 * Clean and convenient Material You UI, optimized for phones, tablets and desktop
+* Tappable manga details backdrops for quick browsing and full-image viewing
 * Standard and Webtoon-optimized customizable reader, gesture support on reading interface
 * Notifications about new chapters with updates feed, manga recommendations (with filters)
 * Integration with manga tracking services: Shikimori, AniList, MyAnimeList, Kitsu
 * Password / fingerprint-protected access to the app
 * Automatically sync app data with other devices on the same account
+* Periodic Telegram backups, including support for using your own bot token
 * Support for older devices running Android 6.0+
 
 </div>
