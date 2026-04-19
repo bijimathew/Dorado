@@ -64,6 +64,8 @@ abstract class HistoryDao : MangaQueryBuilder.ConditionCallback {
 					ListSortOrder.OLDEST -> "history.created_at ASC"
 					ListSortOrder.PROGRESS -> "history.percent DESC"
 					ListSortOrder.UNREAD -> "history.percent ASC"
+					ListSortOrder.UNREAD_CHAPTERS -> "CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END DESC"
+					ListSortOrder.UNREAD_CHAPTERS_REVERSE -> "CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END ASC"
 					ListSortOrder.ALPHABETIC -> "manga.title"
 					ListSortOrder.ALPHABETIC_REVERSE -> "manga.title DESC"
 					ListSortOrder.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"

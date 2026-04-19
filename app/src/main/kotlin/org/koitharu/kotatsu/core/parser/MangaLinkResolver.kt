@@ -34,7 +34,7 @@ class MangaLinkResolver @Inject constructor(
 	}
 
 	private suspend fun resolveAppLink(uri: Uri): Manga? {
-		require(uri.pathSegments.singleOrNull() == "manga") { "Invalid url" }
+		require(uri.isMangaAppLink()) { "Invalid url" }
 		uri.getQueryParameter("id")?.let { mangaId ->
 			// short url
 			return dataRepository.findMangaById(mangaId.toLong(), withChapters = false)
@@ -114,6 +114,10 @@ class MangaLinkResolver @Inject constructor(
 		chapters = null,
 		source = source,
 	)
+
+	private fun Uri.isMangaAppLink(): Boolean {
+		return pathSegments.singleOrNull() == "manga" || host == "manga" && pathSegments.isEmpty()
+	}
 
 	companion object {
 

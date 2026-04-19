@@ -140,10 +140,19 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 	@Query("SELECT COUNT(category_id) FROM favourites WHERE manga_id = :mangaId AND deleted_at = 0")
 	abstract suspend fun findCategoriesCount(mangaId: Long): Int
 
-	@Query("SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit")
+	@Query(
+		"SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
+			"WHERE favourites.deleted_at = 0 AND " +
+			"(SELECT show_in_lib FROM favourite_categories WHERE favourite_categories.category_id = favourites.category_id) = 1 " +
+			"GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
+	)
 	abstract suspend fun findPopularSources(limit: Int): List<String>
 
-	@Query("SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id WHERE favourites.category_id = :categoryId GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit")
+	@Query(
+		"SELECT manga.source AS count FROM favourites LEFT JOIN manga ON manga.manga_id = favourites.manga_id " +
+			"WHERE favourites.category_id = :categoryId AND favourites.deleted_at = 0 " +
+			"GROUP BY manga.source ORDER BY COUNT(manga.source) DESC LIMIT :limit",
+	)
 	abstract suspend fun findPopularSources(categoryId: Long, limit: Int): List<String>
 
 	fun dump(): Flow<FavouriteManga> = flow {
@@ -226,6 +235,8 @@ abstract class FavouritesDao : MangaQueryBuilder.ConditionCallback {
 		ListSortOrder.NEW_CHAPTERS -> "IFNULL((SELECT chapters_new FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"
 		ListSortOrder.PROGRESS -> "IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0) DESC"
 		ListSortOrder.UNREAD -> "IFNULL((SELECT percent FROM history WHERE history.manga_id = manga.manga_id), 0) ASC"
+		ListSortOrder.UNREAD_CHAPTERS -> "IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0) DESC"
+		ListSortOrder.UNREAD_CHAPTERS_REVERSE -> "IFNULL((SELECT CASE WHEN history.chapters > 0 AND history.percent BETWEEN 0 AND 1 THEN CAST(history.chapters * (1 - history.percent) AS INTEGER) ELSE 0 END FROM history WHERE history.manga_id = manga.manga_id AND history.deleted_at = 0), 0) ASC"
 		ListSortOrder.LAST_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) DESC"
 		ListSortOrder.LONG_AGO_READ -> "IFNULL((SELECT updated_at FROM history WHERE history.manga_id = manga.manga_id), 0) ASC"
 		ListSortOrder.UPDATED -> "IFNULL((SELECT last_chapter_date FROM tracks WHERE tracks.manga_id = manga.manga_id), 0) DESC"

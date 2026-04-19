@@ -296,6 +296,8 @@ private fun MangaHistory.header(order: ListSortOrder): ListHeader? = when (order
 	ListSortOrder.ALPHABETIC_REVERSE,
 	ListSortOrder.RELEVANCE,
 	ListSortOrder.NEW_CHAPTERS,
+	ListSortOrder.UNREAD_CHAPTERS,
+	ListSortOrder.UNREAD_CHAPTERS_REVERSE,
 	ListSortOrder.UPDATED,
 	ListSortOrder.RATING -> null
 }

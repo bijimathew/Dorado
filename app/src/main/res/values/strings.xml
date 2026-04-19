@@ -41,6 +41,8 @@
     <string name="download_complete">Downloaded</string>
     <string name="downloads">Downloads</string>
     <string name="by_name">Name</string>
+    <string name="by_unread_chapters">Unread chapters</string>
+    <string name="by_unread_chapters_reverse">Unread chapters reversed</string>
     <string name="popular">Popular</string>
     <string name="updated">Updated</string>
     <string name="newest">Newest</string>
@@ -738,6 +740,7 @@
     <string name="skip_all">Skip all</string>
     <string name="stuck">Stuck</string>
     <string name="not_in_favorites">Not in favorites</string>
+    <string name="not_on_device">Not on device</string>
     <string name="updated_long_ago">Updated long ago</string>
     <string name="unpopular">Unpopular</string>
     <string name="low_rating">Low rating</string>

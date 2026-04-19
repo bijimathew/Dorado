@@ -165,5 +165,13 @@ sealed interface ListFilterOption {
 				titleResId = R.string.not_in_favorites,
 				titleText = null,
 			)
+
+		val NOT_DOWNLOADED
+			get() = Inverted(
+				option = Downloaded,
+				iconResId = R.drawable.ic_storage,
+				titleResId = R.string.not_on_device,
+				titleText = null,
+			)
 	}
 }
