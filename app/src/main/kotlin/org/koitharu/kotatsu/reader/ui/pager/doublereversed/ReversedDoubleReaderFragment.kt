@@ -19,10 +19,19 @@ class ReversedDoubleReaderFragment : DoubleReaderFragment() {
 	}
 
 	override fun notifyPageChanged(lowerPos: Int, upperPos: Int) {
-		viewModel.onCurrentPageChanged(reversed(upperPos), reversed(lowerPos))
+		val reversedLower = positionMap.getOrElse(upperPos) { -1 }
+		val reversedUpper = positionMap.getOrElse(lowerPos) { -1 }
+		val totalPages = originalPageCount
+		val originalLower = if (reversedLower >= 0) (totalPages - 1 - reversedLower) else -1
+		val originalUpper = if (reversedUpper >= 0) (totalPages - 1 - reversedUpper) else -1
+		val lower = if (originalLower >= 0) originalLower else originalUpper
+		val upper = if (originalUpper >= 0) originalUpper else originalLower
+		if (lower >= 0) {
+			viewModel.onCurrentPageChanged(lower, upper.coerceAtLeast(lower))
+		}
 	}
 
 	private fun reversed(position: Int): Int {
-		return ((readerAdapter?.itemCount ?: 0) - position - 1).coerceAtLeast(0)
+		return (originalPageCount - position - 1).coerceAtLeast(0)
 	}
 }
