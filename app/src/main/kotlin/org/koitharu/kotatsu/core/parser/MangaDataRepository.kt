@@ -136,7 +136,7 @@ class MangaDataRepository @Inject constructor(
 	}
 
 	suspend fun resolveIntent(intent: MangaIntent, withChapters: Boolean): Manga? = when {
-		intent.manga != null -> intent.manga.withCachedChaptersIfNeeded(withChapters)
+		intent.manga != null -> intent.manga.withStoredIdentityIfNeeded().withCachedChaptersIfNeeded(withChapters)
 		intent.mangaId != 0L -> findMangaById(intent.mangaId, withChapters)
 		intent.uri != null -> resolverProvider.get().resolve(intent.uri).withCachedChaptersIfNeeded(withChapters)
 		else -> null
@@ -207,6 +207,13 @@ class MangaDataRepository @Inject constructor(
 		tables = arrayOf(TABLE_FAVOURITES, TABLE_FAVOURITE_CATEGORIES),
 		emitInitialState = emitInitialState,
 	)
+
+	private suspend fun Manga.withStoredIdentityIfNeeded(): Manga {
+		if (isLocal) {
+			return this
+		}
+		return db.getMangaDao().findByIdentity(source.name, url, publicUrl)?.toManga() ?: this
+	}
 
 	private suspend fun Manga.withCachedChaptersIfNeeded(flag: Boolean): Manga = if (flag && !isLocal && chapters.isNullOrEmpty()) {
 		val cachedChapters = db.getChaptersDao().findAll(id)

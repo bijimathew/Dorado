@@ -149,20 +149,29 @@ class DetailsLoadUseCase @Inject constructor(
         mangaDataRepository.updateChapters(mangaDetails.toManga())
     }
 
-    private suspend fun getDetails(seed: Manga, force: Boolean) = runCatchingCancellable {
-        val repository = mangaRepositoryFactory.create(seed.source)
-        if (repository is CachingMangaRepository) {
-            repository.getDetails(seed, if (force) CachePolicy.WRITE_ONLY else CachePolicy.ENABLED)
-        } else {
-            repository.getDetails(seed)
-        }
-    }.recoverNotNull { e ->
-        if (e is NotFoundException) {
-            recoverUseCase(seed)
-        } else {
-            null
-        }
-    }
+	private suspend fun getDetails(seed: Manga, force: Boolean) = runCatchingCancellable {
+		val repository = mangaRepositoryFactory.create(seed.source)
+		val details = if (repository is CachingMangaRepository) {
+			repository.getDetails(seed, if (force) CachePolicy.WRITE_ONLY else CachePolicy.ENABLED)
+		} else {
+			repository.getDetails(seed)
+		}
+		details.withSeedIdentityIfSameManga(seed)
+	}.recoverNotNull { e ->
+		if (e is NotFoundException) {
+			recoverUseCase(seed)
+		} else {
+			null
+		}
+	}
+
+	private fun Manga.withSeedIdentityIfSameManga(seed: Manga): Manga {
+		return if (id != seed.id && source == seed.source && (url == seed.url || publicUrl == seed.publicUrl)) {
+			copy(id = seed.id)
+		} else {
+			this
+		}
+	}
 
     private suspend fun String.parseAsHtml(withImages: Boolean): CharSequence? = if (withImages) {
         runInterruptible(Dispatchers.IO) {

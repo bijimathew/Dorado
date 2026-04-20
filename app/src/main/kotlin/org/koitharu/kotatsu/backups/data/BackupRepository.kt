@@ -31,6 +31,7 @@ import org.koitharu.kotatsu.backups.data.model.SourceBackup
 import org.koitharu.kotatsu.backups.data.model.StatisticBackup
 import org.koitharu.kotatsu.backups.domain.BackupSection
 import org.koitharu.kotatsu.core.db.MangaDatabase
+import org.koitharu.kotatsu.core.db.migrations.MangaIdentityMerge
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.CompositeResult
 import org.koitharu.kotatsu.core.util.progress.Progress
@@ -215,6 +216,13 @@ class BackupRepository @Inject constructor(
             input.closeEntry()
             entry = input.nextEntry
         }
+        if (sections.any { it.canContainMangaIdentityDuplicates() }) {
+            result += runCatchingCancellable {
+                database.withTransaction {
+                    MangaIdentityMerge.mergeDuplicateMangaByIdentity(database.openHelper.writableDatabase)
+                }
+            }
+        }
         progress?.emit(commonProgress)
         return result
     }
@@ -310,5 +318,22 @@ class BackupRepository @Inject constructor(
                 block(item)
             }
         }
+    }
+
+    private fun BackupSection.canContainMangaIdentityDuplicates() = when (this) {
+        BackupSection.HISTORY,
+        BackupSection.FAVOURITES,
+        BackupSection.BOOKMARKS,
+        BackupSection.STATS,
+        -> true
+
+        BackupSection.INDEX,
+        BackupSection.CATEGORIES,
+        BackupSection.SETTINGS,
+        BackupSection.SETTINGS_READER_GRID,
+        BackupSection.SOURCES,
+        BackupSection.SCROBBLING,
+        BackupSection.SAVED_FILTERS,
+        -> false
     }
 }
