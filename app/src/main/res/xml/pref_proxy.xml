@@ -12,6 +12,11 @@
 		android:title="@string/type"
 		app:useSimpleSummaryProvider="true" />
 
+	<SwitchPreferenceCompat
+		android:key="proxy_bypass_enabled"
+		android:summary="@string/proxy_bypass_enabled_summary"
+		android:title="@string/proxy_bypass_enabled" />
+
 	<EditTextPreference
 		android:key="proxy_address"
 		android:title="@string/address"

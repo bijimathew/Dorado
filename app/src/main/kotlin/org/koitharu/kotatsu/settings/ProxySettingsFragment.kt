@@ -94,18 +94,22 @@ class ProxySettingsFragment : BasePreferenceFragment(R.string.proxy),
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
 		when (key) {
-			AppSettings.KEY_PROXY_TYPE -> updateDependencies()
+			AppSettings.KEY_PROXY_TYPE,
+			AppSettings.KEY_PROXY_BYPASS_ENABLED -> updateDependencies()
 		}
 	}
 
 	private fun updateDependencies() {
-		val isProxyEnabled = settings.proxyType != Proxy.Type.DIRECT
-		findPreference<Preference>(AppSettings.KEY_PROXY_ADDRESS)?.isEnabled = isProxyEnabled
-		findPreference<Preference>(AppSettings.KEY_PROXY_PORT)?.isEnabled = isProxyEnabled
-		findPreference<PreferenceCategory>(AppSettings.KEY_PROXY_AUTH)?.isEnabled = isProxyEnabled
-		findPreference<Preference>(AppSettings.KEY_PROXY_LOGIN)?.isEnabled = isProxyEnabled
-		findPreference<Preference>(AppSettings.KEY_PROXY_PASSWORD)?.isEnabled = isProxyEnabled
-		findPreference<Preference>(AppSettings.KEY_PROXY_TEST)?.isEnabled = isProxyEnabled && testJob?.isActive != true
+		val isBypassEnabled = settings.isProxyBypassEnabled
+		val isRegularProxyEnabled = settings.proxyType != Proxy.Type.DIRECT
+		val areRegularProxyFieldsEnabled = isRegularProxyEnabled && !isBypassEnabled
+		val isAnyProxyEnabled = isBypassEnabled || isRegularProxyEnabled
+		findPreference<Preference>(AppSettings.KEY_PROXY_ADDRESS)?.isEnabled = areRegularProxyFieldsEnabled
+		findPreference<Preference>(AppSettings.KEY_PROXY_PORT)?.isEnabled = areRegularProxyFieldsEnabled
+		findPreference<PreferenceCategory>(AppSettings.KEY_PROXY_AUTH)?.isEnabled = areRegularProxyFieldsEnabled
+		findPreference<Preference>(AppSettings.KEY_PROXY_LOGIN)?.isEnabled = areRegularProxyFieldsEnabled
+		findPreference<Preference>(AppSettings.KEY_PROXY_PASSWORD)?.isEnabled = areRegularProxyFieldsEnabled
+		findPreference<Preference>(AppSettings.KEY_PROXY_TEST)?.isEnabled = isAnyProxyEnabled && testJob?.isActive != true
 	}
 
 	private fun testConnection() {

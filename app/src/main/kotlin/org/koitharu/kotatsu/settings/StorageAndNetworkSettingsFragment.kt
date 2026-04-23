@@ -56,7 +56,8 @@ class StorageAndNetworkSettingsFragment :
 
             AppSettings.KEY_PROXY_TYPE,
             AppSettings.KEY_PROXY_ADDRESS,
-            AppSettings.KEY_PROXY_PORT -> {
+            AppSettings.KEY_PROXY_PORT,
+            AppSettings.KEY_PROXY_BYPASS_ENABLED -> {
                 bindProxySummary()
             }
         }
@@ -68,6 +69,7 @@ class StorageAndNetworkSettingsFragment :
             val address = settings.proxyAddress
             val port = settings.proxyPort
             summary = when {
+                settings.isProxyBypassEnabled -> context.getString(R.string.proxy_bypass_enabled)
                 type == Proxy.Type.DIRECT -> context.getString(R.string.disabled)
                 address.isNullOrEmpty() || port == 0 -> context.getString(R.string.invalid_proxy_configuration)
                 else -> "$address:$port"

@@ -18,9 +18,37 @@ import java.io.File
 class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig {
 
     private val prefs = context.getSharedPreferences(
-        source.name.replace(File.separatorChar, '$'),
+        prefsName(source),
         Context.MODE_PRIVATE,
     )
+
+    init {
+        val newName = prefsName(source)
+        listOf(source.name, "plugin.jar:$newName")
+            .filter { it != newName }
+            .forEach { legacyName ->
+                val legacy = context.getSharedPreferences(legacyName, Context.MODE_PRIVATE)
+                if (legacy.all.isEmpty()) {
+                    return@forEach
+                }
+                prefs.edit(commit = true) {
+                    legacy.all.forEach { (key, value) ->
+                        when (value) {
+                            is String -> putString(key, value)
+                            is Boolean -> putBoolean(key, value)
+                            is Int -> putInt(key, value)
+                            is Long -> putLong(key, value)
+                            is Float -> putFloat(key, value)
+                            is Set<*> -> {
+                                @Suppress("UNCHECKED_CAST")
+                                putStringSet(key, value as Set<String>)
+                            }
+                        }
+                    }
+                }
+                legacy.edit(commit = true) { clear() }
+            }
+    }
 
 	var defaultSortOrder: SortOrder?
 		get() = prefs.getEnumValue(KEY_SORT_ORDER, SortOrder::class.java)
@@ -52,13 +80,13 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 		} as T
 	}
 
-	operator fun <T> set(key: ConfigKey<T>, value: T) = prefs.edit {
+	operator fun <T> set(key: ConfigKey<T>, value: T) = prefs.edit(commit = true) {
 		when (key) {
 			is ConfigKey.Domain -> putString(key.key, value as String?)
 			is ConfigKey.ShowSuspiciousContent -> putBoolean(key.key, value as Boolean)
 			is ConfigKey.UserAgent -> putString(key.key, (value as String?)?.sanitizeHeaderValue())
 			is ConfigKey.SplitByTranslations -> putBoolean(key.key, value as Boolean)
-			is ConfigKey.PreferredImageServer -> putString(key.key, value as String? ?: "")
+			is ConfigKey.PreferredImageServer -> putString(key.key, value as String?)
             is ConfigKey.InterceptCloudflare -> putBoolean(key.key, value as Boolean)
 			is ConfigKey.DisableUpdateChecking -> {
 				// Read-only - parser-controlled only, users cannot change this
@@ -80,5 +108,9 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 		const val KEY_NO_CAPTCHA = "no_captcha"
 		const val KEY_SLOWDOWN = "slowdown"
 		const val KEY_SORT_ORDER = "sort_order"
+
+        fun prefsName(source: MangaSource): String {
+            return source.name.substringAfter(':').replace(File.separatorChar, '$')
+        }
 	}
 }
