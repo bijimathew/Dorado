@@ -14,6 +14,7 @@ import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.tabs.TabLayoutMediator
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.FlowCollector
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.BaseFragment
@@ -21,6 +22,7 @@ import org.koitharu.kotatsu.core.ui.util.ActionModeListener
 import org.koitharu.kotatsu.core.ui.util.RecyclerViewOwner
 import org.koitharu.kotatsu.core.ui.util.ReversibleActionObserver
 import org.koitharu.kotatsu.core.util.ext.addMenuProvider
+import org.koitharu.kotatsu.core.util.ext.doOnPageChanged
 import org.koitharu.kotatsu.core.util.ext.findCurrentPagerFragment
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
@@ -58,9 +60,29 @@ class FavouritesContainerFragment : BaseFragment<FragmentFavouritesContainerBind
 			binding.pager,
 			FavouritesTabConfigurationStrategy(pagerAdapter, viewModel, router),
 		).attach()
+		binding.pager.doOnPageChanged { position ->
+			pagerAdapter.getItemOrNull(position)?.let {
+				viewModel.onCategorySelected(it.id)
+			}
+		}
 		binding.stubEmpty.setOnInflateListener(this)
 		actionModeDelegate.addListener(this)
-		viewModel.categories.observe(viewLifecycleOwner, pagerAdapter)
+		viewModel.categories.observe(viewLifecycleOwner, object : FlowCollector<List<FavouriteTabModel>> {
+			override suspend fun emit(value: List<FavouriteTabModel>) {
+				pagerAdapter.submitList(value, Runnable {
+					if (viewBinding !== binding || value.isEmpty()) {
+						return@Runnable
+					}
+					val position = viewModel.getCategoryPosition(value)
+					if (binding.pager.currentItem != position) {
+						binding.pager.setCurrentItem(position, false)
+					}
+					value.getOrNull(binding.pager.currentItem)?.let {
+						viewModel.onCategorySelected(it.id)
+					}
+				})
+			}
+		})
 		viewModel.isEmpty.observe(viewLifecycleOwner, ::onEmptyStateChanged)
 		addMenuProvider(FavouritesContainerMenuProvider(router))
 		viewModel.onActionDone.observeEvent(viewLifecycleOwner, ReversibleActionObserver(binding.pager))

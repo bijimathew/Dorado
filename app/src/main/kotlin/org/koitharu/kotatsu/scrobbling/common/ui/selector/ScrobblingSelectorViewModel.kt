@@ -51,6 +51,7 @@ class ScrobblingSelectorViewModel @Inject constructor(
 	private val scrobblerMangaList = MutableStateFlow<List<ScrobblerManga>>(emptyList())
 	private val hasNextPage = MutableStateFlow(true)
 	private val listError = MutableStateFlow<Throwable?>(null)
+	private val resolvedSearchQuery = MutableStateFlow<String?>(null)
 	private var loadingJob: Job? = null
 	private var doneJob: Job? = null
 	private var initJob: Job? = null
@@ -94,6 +95,7 @@ class ScrobblingSelectorViewModel @Inject constructor(
 	fun search(query: String) {
 		loadingJob?.cancel()
 		searchQuery.value = query
+		resolvedSearchQuery.value = null
 		loadList(append = false)
 	}
 
@@ -114,6 +116,7 @@ class ScrobblingSelectorViewModel @Inject constructor(
 		loadingJob?.cancel()
 		hasNextPage.value = true
 		scrobblerMangaList.value = emptyList()
+		resolvedSearchQuery.value = null
 		loadList(append = false)
 	}
 
@@ -125,8 +128,9 @@ class ScrobblingSelectorViewModel @Inject constructor(
 			listError.value = null
 			val offset = if (append) scrobblerMangaList.value.size else 0
 			runCatchingCancellable {
-				currentScrobbler.findManga(checkNotNull(searchQuery.value), offset)
-			}.onSuccess { list ->
+				findManga(offset)
+			}.onSuccess { (query, list) ->
+				resolvedSearchQuery.value = query
 				val newList = (if (append) {
 					scrobblerMangaList.value + list
 				} else {
@@ -186,6 +190,7 @@ class ScrobblingSelectorViewModel @Inject constructor(
 		loadingJob?.cancel()
 		hasNextPage.value = true
 		scrobblerMangaList.value = emptyList()
+		resolvedSearchQuery.value = null
 		initJob = launchJob(Dispatchers.Default) {
 			try {
 				val info = currentScrobbler.getScrobblingInfoOrNull(manga.id)
@@ -196,6 +201,38 @@ class ScrobblingSelectorViewModel @Inject constructor(
 				loadList(append = false)
 			}
 		}
+	}
+
+	private suspend fun findManga(offset: Int): Pair<String, List<ScrobblerManga>> {
+		val query = searchQuery.requireValue()
+		if (offset > 0) {
+			val resolvedQuery = resolvedSearchQuery.value ?: query
+			return resolvedQuery to currentScrobbler.findManga(resolvedQuery, offset)
+		}
+		var lastQuery = query
+		for (candidate in getSearchQueries(query)) {
+			lastQuery = candidate
+			val list = currentScrobbler.findManga(candidate, offset)
+			if (list.isNotEmpty()) {
+				return candidate to list
+			}
+		}
+		return lastQuery to emptyList()
+	}
+
+	private fun getSearchQueries(query: String): List<String> {
+		if (query != manga.title) {
+			return listOf(query)
+		}
+		return buildList {
+			add(query)
+			manga.altTitles
+				.asSequence()
+				.map { it.trim() }
+				.filter { it.isNotEmpty() }
+				.filter { it != query }
+				.forEach(::add)
+		}.distinct()
 	}
 
 	private fun emptyResultsHint() = ScrobblerHint(

@@ -57,6 +57,18 @@ class FavouritesContainerViewModel @Inject constructor(
 		return result
 	}
 
+	fun getCategoryPosition(categories: List<FavouriteTabModel>): Int {
+		if (categories.isEmpty()) {
+			return 0
+		}
+		val position = categories.indexOfFirst { it.id == settings.lastFavoritesCategoryId }
+		return position.takeIf { it >= 0 } ?: 0
+	}
+
+	fun onCategorySelected(categoryId: Long) {
+		settings.lastFavoritesCategoryId = categoryId
+	}
+
 	fun hide(categoryId: Long) {
 		launchJob(Dispatchers.Default) {
 			if (categoryId == NO_ID) {

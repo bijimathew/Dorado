@@ -38,9 +38,15 @@ class FavouritesContainerAdapter(fragment: Fragment) : FragmentStateAdapter(frag
 	}
 
 	override suspend fun emit(value: List<FavouriteTabModel>) {
+		submitList(value)
+	}
+
+	fun submitList(value: List<FavouriteTabModel>, commitCallback: Runnable? = null) {
 		// Keep collection non-blocking: submitList commit callbacks are not guaranteed.
-		differ.submitList(value)
+		differ.submitList(value, commitCallback)
 	}
 
 	fun getItem(position: Int): FavouriteTabModel = differ.currentList[position]
+
+	fun getItemOrNull(position: Int): FavouriteTabModel? = differ.currentList.getOrNull(position)
 }

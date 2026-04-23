@@ -22,6 +22,7 @@ class HistoryListQuickFilter @Inject constructor(
 		if (settings.isTrackerEnabled) {
 			add(ListFilterOption.Macro.NEW_CHAPTERS)
 		}
+		add(ListFilterOption.Macro.UNREAD)
 		add(ListFilterOption.Macro.COMPLETED)
 		add(ListFilterOption.Macro.READING)
 		add(ListFilterOption.Macro.FAVORITE)
@@ -32,7 +33,7 @@ class HistoryListQuickFilter @Inject constructor(
 		repository.getPopularTags(3).mapTo(this) {
 			ListFilterOption.Tag(it)
 		}
-		repository.getPopularSources(3).mapTo(this) {
+		repository.getPopularSources(Int.MAX_VALUE).mapTo(this) {
 			ListFilterOption.Source(it)
 		}
 	}

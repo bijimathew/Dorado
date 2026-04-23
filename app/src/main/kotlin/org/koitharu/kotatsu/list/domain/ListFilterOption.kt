@@ -47,6 +47,7 @@ sealed interface ListFilterOption {
 		@DrawableRes override val iconResId: Int,
 	) : ListFilterOption {
 
+		UNREAD(R.string.unread, R.drawable.ic_bookmark),
 		COMPLETED(R.string.status_completed, R.drawable.ic_state_finished),
 		READING(R.string.status_reading, R.drawable.ic_state_ongoing),
 		NEW_CHAPTERS(R.string.new_chapters, R.drawable.ic_updated),
