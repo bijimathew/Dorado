@@ -1,0 +1,3 @@
+Refresh the parser bundle with reviewed source fixes, new sources, and current domain rewrites.
+Preserve per-source settings across source-name and plugin-backed naming changes.
+Add an optional beta censorship-bypass proxy mode for blocked networks.
