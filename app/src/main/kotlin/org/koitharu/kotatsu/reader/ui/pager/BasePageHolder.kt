@@ -235,4 +235,15 @@ abstract class BasePageHolder<B : ViewBinding>(
 			else -> 4
 		}
 	}
+
+	protected fun defaultMaxScale(view: SubsamplingScaleImageView): Float {
+		return DEFAULT_MAX_SCALE_MULTIPLIER * maxOf(
+			view.width / view.sWidth.toFloat(),
+			view.height / view.sHeight.toFloat(),
+		)
+	}
+
+	companion object {
+		protected const val DEFAULT_MAX_SCALE_MULTIPLIER = 4f
+	}
 }

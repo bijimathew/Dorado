@@ -115,7 +115,7 @@ class WebtoonImageView @JvmOverloads constructor(
 
 	private fun scrollToInternal(pos: Int) {
 		minScale = width / sWidth.toFloat()
-		maxScale = minScale
+		maxScale = minScale * DEFAULT_MAX_SCALE_MULTIPLIER
 		scrollPos = pos
 		ct.set(sWidth / 2f, (height / 2f + pos.toFloat()) / minScale)
 		setScaleAndCenter(minScale, ct)
@@ -123,7 +123,7 @@ class WebtoonImageView @JvmOverloads constructor(
 
 	private fun adjustScale() {
 		minScale = width / sWidth.toFloat()
-		maxScale = minScale
+		maxScale = minScale * DEFAULT_MAX_SCALE_MULTIPLIER
 		minimumScaleType = SCALE_TYPE_CUSTOM
 		requestLayout()
 	}
@@ -144,5 +144,9 @@ class WebtoonImageView @JvmOverloads constructor(
 		canvas.drawRect(1f, 1f, width.toFloat() - 1f, height.toFloat() - 1f, paint)
 		paint.style = Paint.Style.FILL
 		canvas.drawText("${getScroll()} / ${getScrollRange()}", 100f, 100f, paint)
+	}
+
+	private companion object {
+		const val DEFAULT_MAX_SCALE_MULTIPLIER = 2f
 	}
 }

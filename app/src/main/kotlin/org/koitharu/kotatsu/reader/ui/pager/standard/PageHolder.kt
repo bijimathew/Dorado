@@ -75,10 +75,7 @@ open class PageHolder(
 	}
 
 	override fun onReady() {
-		binding.ssiv.maxScale = 2f * maxOf(
-			binding.ssiv.width / binding.ssiv.sWidth.toFloat(),
-			binding.ssiv.height / binding.ssiv.sHeight.toFloat(),
-		)
+		binding.ssiv.maxScale = defaultMaxScale(binding.ssiv)
 		binding.ssiv.colorFilter = settings.colorFilter?.toColorFilter()
 		when (settings.zoomMode) {
 			ZoomMode.FIT_CENTER -> {
