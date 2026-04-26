@@ -42,13 +42,11 @@ class AlternativesUseCase @Inject constructor(
 						}
 					}.getOrNull()
 					list?.forEach { m ->
-						if (m.id != manga.id) {
-							launch {
-								val details = runCatchingCancellable {
-									mangaRepositoryFactory.create(m.source).getDetails(m)
-								}.getOrDefault(m)
-								send(details)
-							}
+						launch {
+							val details = runCatchingCancellable {
+								mangaRepositoryFactory.create(m.source).getDetails(m)
+							}.getOrDefault(m)
+							send(details)
 						}
 					}
 				}
@@ -56,14 +54,23 @@ class AlternativesUseCase @Inject constructor(
 		}
 	}
 
-	private suspend fun getSources(ref: MangaSource, disabled: Boolean): List<MangaSource> = if (disabled) {
-		sourcesRepository.getDisabledSources()
-	} else {
-		sourcesRepository.getEnabledSources()
+	private suspend fun getSources(ref: MangaSource, disabled: Boolean): List<MangaSource> = buildList {
+		if (!disabled) {
+			add(ref)
+		}
+		val sources = if (disabled) {
+			sourcesRepository.getDisabledSources()
+		} else {
+			sourcesRepository.getEnabledSources()
+		}
+		addAll(sources.filter { it != ref })
 	}.sortedByDescending { it.priority(ref) }
 
 	private fun MangaSource.priority(ref: MangaSource): Int {
 		var res = 0
+		if (this == ref) {
+			res += 8
+		}
 		if (this is MangaParserSource && ref is MangaParserSource) {
 			if (locale == ref.locale) {
 				res += 4
