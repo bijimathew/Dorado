@@ -21,12 +21,12 @@ object MangaIdentityMerge {
 		db.execSQL(
 			"""
 			INSERT OR IGNORE INTO manga_identity_canonical(source, identity_url, new_id)
-			SELECT m.source, ${identityUrl("m")}, COALESCE(
+			SELECT ${identitySource("m")}, ${identityUrl("m")}, COALESCE(
 				(
 					SELECT f.manga_id
 					FROM favourites AS f
 					INNER JOIN manga AS mf ON mf.manga_id = f.manga_id
-					WHERE mf.source = m.source AND ${identityUrl("mf")} = ${identityUrl("m")} AND f.deleted_at = 0
+					WHERE ${identitySource("mf")} = ${identitySource("m")} AND ${identityUrl("mf")} = ${identityUrl("m")} AND f.deleted_at = 0
 					GROUP BY f.manga_id
 					ORDER BY COUNT(*) DESC, MIN(f.created_at) ASC
 					LIMIT 1
@@ -35,14 +35,14 @@ object MangaIdentityMerge {
 					SELECT h.manga_id
 					FROM history AS h
 					INNER JOIN manga AS mh ON mh.manga_id = h.manga_id
-					WHERE mh.source = m.source AND ${identityUrl("mh")} = ${identityUrl("m")} AND h.deleted_at = 0
+					WHERE ${identitySource("mh")} = ${identitySource("m")} AND ${identityUrl("mh")} = ${identityUrl("m")} AND h.deleted_at = 0
 					ORDER BY h.updated_at DESC
 					LIMIT 1
 				),
 				MIN(m.manga_id)
 			)
 			FROM manga AS m
-			GROUP BY m.source, ${identityUrl("m")}
+			GROUP BY ${identitySource("m")}, ${identityUrl("m")}
 			HAVING COUNT(*) > 1
 			""".trimIndent(),
 		)
@@ -51,7 +51,7 @@ object MangaIdentityMerge {
 			CREATE TEMP TABLE manga_identity_merge AS
 			SELECT m.manga_id AS old_id, c.new_id AS new_id
 			FROM manga AS m
-			INNER JOIN manga_identity_canonical AS c ON c.source = m.source AND c.identity_url = ${identityUrl("m")}
+			INNER JOIN manga_identity_canonical AS c ON c.source = ${identitySource("m")} AND c.identity_url = ${identityUrl("m")}
 			WHERE m.manga_id != c.new_id
 			""".trimIndent(),
 		)
@@ -238,7 +238,40 @@ object MangaIdentityMerge {
 		db.execSQL("DROP TABLE IF EXISTS manga_identity_canonical")
 	}
 
+	private fun identitySource(alias: String): String {
+		return "CASE WHEN $alias.source = 'MANGA_OVH_UPDATES' THEN 'MANGA_OVH' ELSE $alias.source END"
+	}
+
 	private fun identityUrl(alias: String): String {
-		return "CASE WHEN $alias.source = 'REMANGA' THEN rtrim($alias.url, '_') ELSE $alias.url END"
+		val source = identitySource(alias)
+		val url = pathUrl("$alias.url")
+		val publicUrl = pathUrl("$alias.public_url")
+		val mangaOvhUrl = "CASE WHEN $alias.public_url != '' THEN $publicUrl ELSE $url END"
+		return """
+			CASE
+				WHEN $source = 'REMANGA' THEN rtrim($url, '_')
+				WHEN $source = 'MANGA_OVH' THEN
+					CASE
+						WHEN $mangaOvhUrl LIKE '/manga/%' THEN '/content/' || substr($mangaOvhUrl, 8)
+						ELSE $mangaOvhUrl
+					END
+				ELSE $url
+			END
+		""".trimIndent()
+	}
+
+	private fun pathUrl(column: String): String {
+		val schemeIndex = "instr($column, '://')"
+		val pathIndex = "instr(substr($column, $schemeIndex + 3), '/')"
+		return """
+			rtrim(
+				CASE
+					WHEN $schemeIndex = 0 THEN $column
+					WHEN $pathIndex = 0 THEN ''
+					ELSE substr($column, $schemeIndex + $pathIndex + 2)
+				END,
+				'/'
+			)
+		""".trimIndent()
 	}
 }

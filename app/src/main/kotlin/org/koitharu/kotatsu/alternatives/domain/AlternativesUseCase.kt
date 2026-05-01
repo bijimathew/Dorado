@@ -6,7 +6,11 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import org.koitharu.kotatsu.core.model.MangaSourceInfo
+import org.koitharu.kotatsu.core.model.MangaIdentityKey
+import org.koitharu.kotatsu.core.model.identityKeys
+import org.koitharu.kotatsu.core.model.identityName
+import org.koitharu.kotatsu.core.model.isSameEntryAs
+import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.ext.toLocale
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
@@ -34,8 +38,13 @@ class AlternativesUseCase @Inject constructor(
 		}
 		val semaphore = Semaphore(MAX_PARALLELISM)
 		return channelFlow {
-			val seen = HashSet<MangaEntryKey>().apply {
-				add(manga.entryKey())
+			val seen = HashSet(manga.identityKeys())
+			fun markSeen(keys: Set<MangaIdentityKey>): Boolean = synchronized(seen) {
+				var hasNew = false
+				for (key in keys) {
+					hasNew = seen.add(key) || hasNew
+				}
+				hasNew
 			}
 			for (source in sources) {
 				launch {
@@ -49,8 +58,8 @@ class AlternativesUseCase @Inject constructor(
 						if (m.isSameEntryAs(manga)) {
 							return@forEach
 						}
-						val rawKey = m.entryKey()
-						if (!seen.addSynchronized(rawKey)) {
+						val rawKeys = m.identityKeys()
+						if (!markSeen(rawKeys)) {
 							return@forEach
 						}
 						launch {
@@ -60,8 +69,8 @@ class AlternativesUseCase @Inject constructor(
 							if (details.isSameEntryAs(manga)) {
 								return@launch
 							}
-							val detailsKey = details.entryKey()
-							if (detailsKey != rawKey && !seen.addSynchronized(detailsKey)) {
+							val detailsKeys = details.identityKeys()
+							if (detailsKeys != rawKeys && !markSeen(detailsKeys)) {
 								return@launch
 							}
 							send(details)
@@ -84,36 +93,18 @@ class AlternativesUseCase @Inject constructor(
 		}
 		for (source in sources) {
 			val unwrapped = source.unwrap()
-			if (unwrapped.name != refSource.name) {
+			if (unwrapped.identityName() != refSource.identityName()) {
 				add(unwrapped)
 			}
 		}
-	}.distinctBy { it.name }
+	}.distinctBy { it.identityName() }
 		.sortedByDescending { it.priority(ref) }
-
-	private fun Manga.isSameEntryAs(other: Manga): Boolean {
-		if (source.nameKey() != other.source.nameKey()) {
-			return false
-		}
-		val identityUrl = identityUrl()
-		return (id != 0L && id == other.id) ||
-			(identityUrl.isNotBlank() && identityUrl == other.identityUrl()) ||
-			(publicUrl.isNotBlank() && publicUrl.trimEnd('/') == other.publicUrl.trimEnd('/'))
-	}
-
-	private fun Manga.entryKey(): MangaEntryKey {
-		return MangaEntryKey(source.nameKey(), identityUrl().ifBlank { id.toString() })
-	}
-
-	private fun MutableSet<MangaEntryKey>.addSynchronized(key: MangaEntryKey): Boolean = synchronized(this) {
-		add(key)
-	}
 
 	private fun MangaSource.priority(ref: MangaSource): Int {
 		var res = 0
 		val source = unwrap()
 		val refSource = ref.unwrap()
-		if (source.name == refSource.name) {
+		if (source.identityName() == refSource.identityName()) {
 			res += 8
 		}
 		if (source is MangaParserSource && refSource is MangaParserSource) {
@@ -128,37 +119,4 @@ class AlternativesUseCase @Inject constructor(
 		}
 		return res
 	}
-
-	private fun Manga.identityUrl(): String {
-		val sourceName = source.nameKey()
-		return url.toIdentityUrl(sourceName).ifBlank {
-			publicUrl.toIdentityUrl(sourceName)
-		}
-	}
-
-	private fun MangaSource.nameKey(): String = unwrap().name
-
-	private fun MangaSource.unwrap(): MangaSource = (this as? MangaSourceInfo)?.mangaSource ?: this
-
-	private fun String.toIdentityUrl(sourceName: String): String {
-		var result = trim().trimEnd('/')
-		val schemeIndex = result.indexOf("://")
-		if (schemeIndex >= 0) {
-			val pathStart = result.indexOf('/', startIndex = schemeIndex + 3)
-			result = if (pathStart >= 0) {
-				result.substring(pathStart)
-			} else {
-				""
-			}
-		}
-		if (sourceName == MangaParserSource.REMANGA.name) {
-			result = result.trimEnd('_')
-		}
-		return result
-	}
-
-	private data class MangaEntryKey(
-		val sourceName: String,
-		val urlOrId: String,
-	)
 }

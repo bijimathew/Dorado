@@ -13,6 +13,7 @@ import kotlinx.coroutines.runInterruptible
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.isLocal
 import org.koitharu.kotatsu.core.model.isNsfw
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.util.AlphanumComparator
@@ -183,7 +184,7 @@ class LocalMangaRepository @Inject constructor(
 					val mangaInput = LocalMangaParser.getOrNull(file)
 					runCatchingCancellable {
 						val mangaInfo = mangaInput?.getMangaInfo()
-						if (mangaInfo != null && mangaInfo.id == remoteManga.id) {
+						if (mangaInfo?.isSameEntryAs(remoteManga) == true) {
 							send(mangaInput)
 						}
 					}.onFailure {

@@ -1,6 +1,7 @@
 package org.koitharu.kotatsu.alternatives.ui
 
 import org.koitharu.kotatsu.core.model.chaptersCount
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.list.ui.model.ListModel
 import org.koitharu.kotatsu.list.ui.model.MangaGridModel
 import org.koitharu.kotatsu.parsers.model.Manga
@@ -19,7 +20,7 @@ data class MangaAlternativeModel(
 		get() = if (referenceChapters == 0 || chaptersCount == 0) 0 else chaptersCount - referenceChapters
 
 	override fun areItemsTheSame(other: ListModel): Boolean {
-		return other is MangaAlternativeModel && other.manga.id == manga.id
+		return other is MangaAlternativeModel && other.manga.isSameEntryAs(manga)
 	}
 
 	override fun getChangePayload(previousState: ListModel): Any? = if (previousState is MangaAlternativeModel) {

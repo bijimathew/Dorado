@@ -16,6 +16,7 @@ import okio.Path.Companion.toPath
 import okio.openZip
 import org.jetbrains.annotations.Blocking
 import org.koitharu.kotatsu.core.model.LocalMangaSource
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.util.AlphanumComparator
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.URI_SCHEME_ZIP
@@ -261,7 +262,7 @@ class LocalMangaParser(private val uri: Uri) {
 				launch {
 					val parser = getOrNull(File(root, fileName)) ?: getOrNull(File(root, "$fileName.cbz"))
 					val info = runCatchingCancellable { parser?.getMangaInfo() }.getOrNull()
-					if (info?.id == manga.id) {
+					if (info?.isSameEntryAs(manga) == true) {
 						send(parser)
 					}
 				}

@@ -94,6 +94,20 @@ fun MangaSource.getLocale(): Locale? = when (val source = unwrap()) {
 	else -> null
 }
 
+fun MangaSource.identityName(): String = when (val name = unwrap().name) {
+	MangaParserSource.MANGA_OVH_UPDATES.name -> MangaParserSource.MANGA_OVH.name
+	else -> name
+}
+
+fun MangaSource.identityAliases(): Set<String> = when (identityName()) {
+	MangaParserSource.MANGA_OVH.name -> setOf(
+		MangaParserSource.MANGA_OVH.name,
+		MangaParserSource.MANGA_OVH_UPDATES.name,
+	)
+
+	else -> setOf(unwrap().name)
+}
+
 fun MangaSource.getSummary(context: Context): String? = when (val source = unwrap()) {
 	is MangaParserSource -> {
 		val type = context.getString(source.contentType.titleResId)

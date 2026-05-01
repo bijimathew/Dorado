@@ -12,6 +12,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.cache.SafeDeferred
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.util.MultiMutex
 import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
 import org.koitharu.kotatsu.parsers.model.Manga
@@ -41,7 +42,7 @@ abstract class CachingMangaRepository(
 	final override suspend fun getRelated(seed: Manga): List<Manga> = relatedMangaMutex.withLock(seed.id) {
 		cache.getRelatedManga(source, seed.url)?.let { return it }
 		val related = asyncSafe {
-			getRelatedMangaImpl(seed).filterNot { it.id == seed.id }
+			getRelatedMangaImpl(seed).filterNot { it.isSameEntryAs(seed) }
 		}
 		cache.putRelatedManga(source, seed.url, related)
 		related

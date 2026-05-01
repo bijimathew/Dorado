@@ -6,6 +6,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.Closeable
 import org.koitharu.kotatsu.core.prefs.DownloadFormat
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.util.ext.MimeType
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toFileNameSafe
@@ -105,7 +106,7 @@ sealed class LocalMangaOutput(
 			}.onFailure {
 				it.printStackTraceDebug()
 			}.getOrNull() ?: return false
-			return info.id == manga.id
+			return info.isSameEntryAs(manga)
 		}
 	}
 }

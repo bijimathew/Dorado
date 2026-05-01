@@ -19,6 +19,7 @@ import org.koitharu.kotatsu.parsers.model.Demographic
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
 import org.koitharu.kotatsu.parsers.model.MangaListFilter
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaState
 import org.koitharu.kotatsu.parsers.util.findById
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
@@ -152,6 +153,55 @@ fun Manga.chaptersCount(): Int {
 	}
 	return max
 }
+
+fun Manga.isSameEntryAs(other: Manga): Boolean {
+	if (source.identityName() != other.source.identityName()) {
+		return false
+	}
+	if (id != 0L && id == other.id) {
+		return true
+	}
+	return identityValues().intersect(other.identityValues()).isNotEmpty()
+}
+
+fun Manga.identityKeys(): Set<MangaIdentityKey> = identityValues(includeId = true).mapTo(LinkedHashSet()) {
+	MangaIdentityKey(source.identityName(), it)
+}
+
+private fun Manga.identityValues(includeId: Boolean = false): Set<String> = buildSet {
+	url.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
+	publicUrl.toIdentityValue(source.identityName()).takeIf(String::isNotBlank)?.let(::add)
+	if (includeId && id != 0L) {
+		add(id.toString())
+	}
+}
+
+private fun String.toIdentityValue(sourceName: String): String {
+	var result = trim().substringBefore('#').substringBefore('?').trimEnd('/')
+	val schemeIndex = result.indexOf("://")
+	if (schemeIndex >= 0) {
+		val pathStart = result.indexOf('/', startIndex = schemeIndex + 3)
+		result = if (pathStart >= 0) {
+			result.substring(pathStart)
+		} else {
+			""
+		}
+	}
+	result = result.trimEnd('/')
+	when (sourceName) {
+		MangaParserSource.MANGA_OVH.name -> if (result.startsWith("/manga/")) {
+			result = "/content/" + result.removePrefix("/manga/")
+		}
+
+		MangaParserSource.REMANGA.name -> result = result.trimEnd('_')
+	}
+	return result
+}
+
+data class MangaIdentityKey(
+	val sourceName: String,
+	val value: String,
+)
 
 fun Manga.isNsfw(): Boolean = contentRating == ContentRating.ADULT || source.isNsfw()
 

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.core.model.isNsfw
+import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.TriStateOption
 import org.koitharu.kotatsu.core.prefs.observeAsFlow
@@ -71,7 +72,7 @@ class DetailsInteractor @Inject constructor(
 
 	suspend fun updateLocal(subject: MangaDetails?, localManga: LocalManga): MangaDetails? {
 		subject ?: return null
-		return if (subject.id == localManga.manga.id) {
+		return if (subject.toManga().isSameEntryAs(localManga.manga)) {
 			if (subject.isLocal) {
 				subject.copy(
 					manga = localManga.manga,
