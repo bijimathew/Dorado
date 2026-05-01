@@ -20,9 +20,7 @@ import org.koitharu.kotatsu.core.db.entity.toManga
 import org.koitharu.kotatsu.core.db.entity.toMangaChapters
 import org.koitharu.kotatsu.core.db.entity.toMangaTags
 import org.koitharu.kotatsu.core.model.LocalMangaSource
-import org.koitharu.kotatsu.core.model.identityAliases
 import org.koitharu.kotatsu.core.model.isLocal
-import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.nav.MangaIntent
 import org.koitharu.kotatsu.core.os.AppShortcutManager
 import org.koitharu.kotatsu.core.prefs.ReaderMode
@@ -214,17 +212,7 @@ class MangaDataRepository @Inject constructor(
 		if (isLocal) {
 			return this
 		}
-		db.getMangaDao().findByIdentity(source.name, url, publicUrl)?.toManga()?.let {
-			return it
-		}
-		for (sourceName in source.identityAliases()) {
-			db.getMangaDao().findAllBySource(sourceName).firstOrNull { entity ->
-				entity.toManga().isSameEntryAs(this)
-			}?.toManga()?.let {
-				return it
-			}
-		}
-		return this
+		return db.getMangaDao().findByIdentity(source.name, url, publicUrl)?.toManga() ?: this
 	}
 
 	private suspend fun Manga.withCachedChaptersIfNeeded(flag: Boolean): Manga = if (flag && !isLocal && chapters.isNullOrEmpty()) {

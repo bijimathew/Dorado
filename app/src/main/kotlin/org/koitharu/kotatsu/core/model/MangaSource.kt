@@ -99,15 +99,6 @@ fun MangaSource.identityName(): String = when (val name = unwrap().name) {
 	else -> name
 }
 
-fun MangaSource.identityAliases(): Set<String> = when (identityName()) {
-	MangaParserSource.MANGA_OVH.name -> setOf(
-		MangaParserSource.MANGA_OVH.name,
-		MangaParserSource.MANGA_OVH_UPDATES.name,
-	)
-
-	else -> setOf(unwrap().name)
-}
-
 fun MangaSource.getSummary(context: Context): String? = when (val source = unwrap()) {
 	is MangaParserSource -> {
 		val type = context.getString(source.contentType.titleResId)
