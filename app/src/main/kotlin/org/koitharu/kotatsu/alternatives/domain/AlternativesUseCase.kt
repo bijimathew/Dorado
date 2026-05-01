@@ -9,7 +9,6 @@ import kotlinx.coroutines.sync.withPermit
 import org.koitharu.kotatsu.core.model.MangaIdentityKey
 import org.koitharu.kotatsu.core.model.identityKeys
 import org.koitharu.kotatsu.core.model.identityName
-import org.koitharu.kotatsu.core.model.isSameEntryAs
 import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.ext.toLocale
@@ -38,7 +37,7 @@ class AlternativesUseCase @Inject constructor(
 		}
 		val semaphore = Semaphore(MAX_PARALLELISM)
 		return channelFlow {
-			val seen = HashSet(manga.identityKeys())
+			val seen = HashSet<MangaIdentityKey>()
 			fun markSeen(keys: Set<MangaIdentityKey>): Boolean = synchronized(seen) {
 				var hasNew = false
 				for (key in keys) {
@@ -55,7 +54,7 @@ class AlternativesUseCase @Inject constructor(
 						}
 					}.getOrNull()
 					list?.forEach { m ->
-						if (m.isSameEntryAs(manga)) {
+						if (m.isExactSameSourceEntryAs(manga)) {
 							return@forEach
 						}
 						val rawKeys = m.identityKeys()
@@ -66,7 +65,7 @@ class AlternativesUseCase @Inject constructor(
 							val details = runCatchingCancellable {
 								mangaRepositoryFactory.create(m.source).getDetails(m)
 							}.getOrDefault(m)
-							if (details.isSameEntryAs(manga)) {
+							if (details.isExactSameSourceEntryAs(manga)) {
 								return@launch
 							}
 							val detailsKeys = details.identityKeys()
@@ -93,12 +92,14 @@ class AlternativesUseCase @Inject constructor(
 		}
 		for (source in sources) {
 			val unwrapped = source.unwrap()
-			if (unwrapped.identityName() != refSource.identityName()) {
-				add(unwrapped)
-			}
+			add(unwrapped)
 		}
-	}.distinctBy { it.identityName() }
+	}.distinctBy { it.unwrap().name }
 		.sortedByDescending { it.priority(ref) }
+
+	private fun Manga.isExactSameSourceEntryAs(other: Manga): Boolean {
+		return id != 0L && id == other.id && source.unwrap().name == other.source.unwrap().name
+	}
 
 	private fun MangaSource.priority(ref: MangaSource): Int {
 		var res = 0
