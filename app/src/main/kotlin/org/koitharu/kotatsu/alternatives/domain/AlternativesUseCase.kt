@@ -54,9 +54,6 @@ class AlternativesUseCase @Inject constructor(
 						}
 					}.getOrNull()
 					list?.forEach { m ->
-						if (m.isExactSameSourceEntryAs(manga)) {
-							return@forEach
-						}
 						val rawKeys = m.identityKeys()
 						if (!markSeen(rawKeys)) {
 							return@forEach
@@ -65,9 +62,6 @@ class AlternativesUseCase @Inject constructor(
 							val details = runCatchingCancellable {
 								mangaRepositoryFactory.create(m.source).getDetails(m)
 							}.getOrDefault(m)
-							if (details.isExactSameSourceEntryAs(manga)) {
-								return@launch
-							}
 							val detailsKeys = details.identityKeys()
 							if (detailsKeys != rawKeys && !markSeen(detailsKeys)) {
 								return@launch
@@ -96,10 +90,6 @@ class AlternativesUseCase @Inject constructor(
 		}
 	}.distinctBy { it.unwrap().name }
 		.sortedByDescending { it.priority(ref) }
-
-	private fun Manga.isExactSameSourceEntryAs(other: Manga): Boolean {
-		return id != 0L && id == other.id && source.unwrap().name == other.source.unwrap().name
-	}
 
 	private fun MangaSource.priority(ref: MangaSource): Int {
 		var res = 0
