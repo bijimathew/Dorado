@@ -45,6 +45,61 @@ class MangaIdentityTest {
 	}
 
 	@Test
+	fun `same stored entry requires exact source and id`() {
+		val old = manga(
+			source = MangaParserSource.MANGA_OVH,
+			id = 1L,
+			url = "/content/i-became-the-games-biggest-villain",
+			publicUrl = "https://inkstory.net/content/i-became-the-games-biggest-villain",
+		)
+		val current = manga(
+			source = MangaParserSource.MANGA_OVH_UPDATES,
+			id = 2L,
+			url = "/content/i-became-the-games-biggest-villain",
+			publicUrl = "https://inkstory.net/content/i-became-the-games-biggest-villain",
+		)
+
+		assertTrue(old.isSameEntryAs(current))
+		assertFalse(old.isSameStoredEntryAs(current))
+	}
+
+	@Test
+	fun `same source and id is same stored entry`() {
+		val old = manga(
+			source = MangaParserSource.MANGA_OVH,
+			id = 1L,
+			url = "/manga/i-became-the-games-biggest-villain",
+			publicUrl = "https://manga.ovh/manga/i-became-the-games-biggest-villain",
+		)
+		val sameStored = manga(
+			source = MangaParserSource.MANGA_OVH,
+			id = 1L,
+			url = "/content/i-became-the-games-biggest-villain",
+			publicUrl = "https://inkstory.net/content/i-became-the-games-biggest-villain",
+		)
+
+		assertTrue(old.isSameStoredEntryAs(sameStored))
+	}
+
+	@Test
+	fun `same source and urls with different ids is migratable`() {
+		val old = manga(
+			source = MangaParserSource.MANGA_OVH,
+			id = 1L,
+			url = "/content/i-became-the-games-biggest-villain",
+			publicUrl = "https://inkstory.net/content/i-became-the-games-biggest-villain",
+		)
+		val current = manga(
+			source = MangaParserSource.MANGA_OVH,
+			id = 2L,
+			url = "/content/i-became-the-games-biggest-villain",
+			publicUrl = "https://inkstory.net/content/i-became-the-games-biggest-villain",
+		)
+
+		assertFalse(old.isSameStoredEntryAs(current))
+	}
+
+	@Test
 	fun `Remanga trailing underscore is ignored`() {
 		val first = manga(
 			source = MangaParserSource.REMANGA,

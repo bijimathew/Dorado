@@ -1,8 +1,10 @@
 package org.koitharu.kotatsu.alternatives.domain
 
 import androidx.room.withTransaction
+import coil3.request.CachePolicy
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.model.getPreferredBranch
+import org.koitharu.kotatsu.core.parser.CachingMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.details.domain.ProgressUpdateUseCase
@@ -38,11 +40,15 @@ constructor(
 			oldManga
 		}
 		val newDetails = if (newManga.chapters.isNullOrEmpty()) {
-			mangaRepositoryFactory.create(newManga.source).getDetails(newManga)
+			mangaRepositoryFactory.create(newManga.source).getFreshDetails(newManga)
 		} else {
 			newManga
 		}
 		mangaDataRepository.storeManga(newDetails, replaceExisting = true)
+		if (oldDetails.id == newDetails.id) {
+			progressUpdateUseCase(newDetails)
+			return
+		}
 		database.withTransaction {
 			// replace favorites
 			val favoritesDao = database.getFavouritesDao()
@@ -115,6 +121,12 @@ constructor(
 			}
 		}
 		progressUpdateUseCase(newDetails)
+	}
+
+	private suspend fun MangaRepository.getFreshDetails(manga: Manga): Manga = if (this is CachingMangaRepository) {
+		getDetails(manga, CachePolicy.WRITE_ONLY)
+	} else {
+		getDetails(manga)
 	}
 
 	private fun makeNewHistory(

@@ -164,6 +164,16 @@ fun Manga.isSameEntryAs(other: Manga): Boolean {
 	return identityValues().intersect(other.identityValues()).isNotEmpty()
 }
 
+fun Manga.isSameStoredEntryAs(other: Manga): Boolean {
+	if (source.unwrap().name != other.source.unwrap().name) {
+		return false
+	}
+	if (id != 0L && other.id != 0L) {
+		return id == other.id
+	}
+	return url == other.url && publicUrl == other.publicUrl
+}
+
 fun Manga.identityKeys(): Set<MangaIdentityKey> = identityValues(includeId = true).mapTo(LinkedHashSet()) {
 	MangaIdentityKey(source.identityName(), it)
 }
