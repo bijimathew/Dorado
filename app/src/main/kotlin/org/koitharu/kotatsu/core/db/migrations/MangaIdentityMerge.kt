@@ -4,6 +4,28 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 object MangaIdentityMerge {
 
+	fun mergeManga(db: SupportSQLiteDatabase, oldId: Long, newId: Long) {
+		if (oldId == newId) {
+			return
+		}
+		db.execSQL("DROP TABLE IF EXISTS manga_identity_canonical")
+		db.execSQL("DROP TABLE IF EXISTS manga_identity_merge")
+		db.execSQL("DROP TABLE IF EXISTS manga_identity_best_history")
+		db.execSQL(
+			"""
+			CREATE TEMP TABLE manga_identity_merge (
+				old_id INTEGER NOT NULL PRIMARY KEY,
+				new_id INTEGER NOT NULL
+			)
+			""".trimIndent(),
+		)
+		db.execSQL(
+			"INSERT INTO manga_identity_merge(old_id, new_id) VALUES(?, ?)",
+			arrayOf(oldId, newId),
+		)
+		mergePrepared(db)
+	}
+
 	fun mergeDuplicateMangaByIdentity(db: SupportSQLiteDatabase) {
 		db.execSQL("DROP TABLE IF EXISTS manga_identity_canonical")
 		db.execSQL("DROP TABLE IF EXISTS manga_identity_merge")
@@ -55,6 +77,10 @@ object MangaIdentityMerge {
 			WHERE m.manga_id != c.new_id
 			""".trimIndent(),
 		)
+		mergePrepared(db)
+	}
+
+	private fun mergePrepared(db: SupportSQLiteDatabase) {
 		db.execSQL(
 			"""
 			CREATE TEMP TABLE manga_identity_best_history (

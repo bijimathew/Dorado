@@ -46,8 +46,8 @@ class AutoFixUseCase @Inject constructor(
 					best
 				}
 			}.selectLastWithTimeout(4, 40, TimeUnit.SECONDS)
-		migrateUseCase(seed, replacement ?: throw NoAlternativesException(ParcelableManga(seed)))
-		return seed to replacement
+		val migrated = migrateUseCase(seed, replacement ?: throw NoAlternativesException(ParcelableManga(seed)))
+		return seed to migrated
 	}
 
 	private suspend fun Manga.isHealthy(): Boolean = runCatchingCancellable {

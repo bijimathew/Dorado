@@ -112,8 +112,7 @@ class AlternativesViewModel @Inject constructor(
 			return
 		}
 		migrationJob = launchLoadingJob(Dispatchers.Default) {
-			migrateUseCase(manga, target)
-			onMigrated.call(target)
+			onMigrated.call(migrateUseCase(manga, target))
 		}
 	}
 

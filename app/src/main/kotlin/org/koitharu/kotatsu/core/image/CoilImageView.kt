@@ -171,7 +171,7 @@ open class CoilImageView @JvmOverloads constructor(
 	}
 
 	protected open val imageRequestContext: Context
-		get() = context
+		get() = context.applicationContext
 
 	protected open fun newRequestBuilder() = ImageRequest.Builder(imageRequestContext).apply {
 		(findViewTreeLifecycleOwner() ?: (context.findActivity() as? LifecycleOwner))?.let(::lifecycle)

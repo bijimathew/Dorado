@@ -150,7 +150,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 
 	@get:FloatRange(0.0, 1.0)
 	var readerDoublePagesSensitivity: Float
-		get() = prefs.getFloat(KEY_READER_DOUBLE_PAGES_SENSITIVITY, 0.5f)
+		get() = prefs.getFloatCompat(KEY_READER_DOUBLE_PAGES_SENSITIVITY, 0.5f, 0f, 1f)
 		set(@FloatRange(0.0, 1.0) value) = prefs.edit { putFloat(KEY_READER_DOUBLE_PAGES_SENSITIVITY, value) }
 
 	val readerScreenOrientation: Int
@@ -188,7 +188,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		set(value) = prefs.edit { putBoolean(KEY_ALL_FAVOURITES_VISIBLE, value) }
 
 	var lastFavoritesCategoryId: Long
-		get() = prefs.getLong(KEY_FAVORITES_LAST_CATEGORY, 0L)
+		get() = prefs.getLongCompat(KEY_FAVORITES_LAST_CATEGORY, 0L)
 		set(value) = prefs.edit { putLong(KEY_FAVORITES_LAST_CATEGORY, value) }
 
 	val isTrackerEnabled: Boolean
@@ -436,8 +436,18 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	var readerColorFilter: ReaderColorFilter?
 		get() = runCatching {
 			ReaderColorFilter(
-				brightness = prefs.getFloat(KEY_CF_BRIGHTNESS, ReaderColorFilter.EMPTY.brightness),
-				contrast = prefs.getFloat(KEY_CF_CONTRAST, ReaderColorFilter.EMPTY.contrast),
+				brightness = prefs.getFloatCompat(
+					KEY_CF_BRIGHTNESS,
+					ReaderColorFilter.EMPTY.brightness,
+					-1f,
+					1f,
+				),
+				contrast = prefs.getFloatCompat(
+					KEY_CF_CONTRAST,
+					ReaderColorFilter.EMPTY.contrast,
+					-1f,
+					1f,
+				),
 				isInverted = prefs.getBoolean(KEY_CF_INVERTED, ReaderColorFilter.EMPTY.isInverted),
 				isGrayscale = prefs.getBoolean(KEY_CF_GRAYSCALE, ReaderColorFilter.EMPTY.isGrayscale),
 				isBookBackground = prefs.getBoolean(KEY_CF_BOOK, ReaderColorFilter.EMPTY.isBookBackground),
@@ -527,7 +537,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 
 	@get:FloatRange(from = 0.0, to = 1.0)
 	var readerAutoscrollSpeed: Float
-		get() = prefs.getFloat(KEY_READER_AUTOSCROLL_SPEED, 0f)
+		get() = prefs.getFloatCompat(KEY_READER_AUTOSCROLL_SPEED, 0f, 0f, 1f)
 		set(@FloatRange(from = 0.0, to = 1.0) value) = prefs.edit {
 			putFloat(
 				KEY_READER_AUTOSCROLL_SPEED,
@@ -675,6 +685,42 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 			connectivityManager.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
 		} else {
 			false
+		}
+	}
+
+	private fun SharedPreferences.getFloatCompat(
+		key: String,
+		defaultValue: Float,
+		minValue: Float,
+		maxValue: Float,
+	): Float {
+		return try {
+			getFloat(key, defaultValue).coerceIn(minValue, maxValue)
+		} catch (_: ClassCastException) {
+			val migratedValue = when (val rawValue = all[key]) {
+				is Number -> rawValue.toFloat()
+				is String -> rawValue.toFloatOrNull()
+				else -> null
+			}?.coerceIn(minValue, maxValue) ?: defaultValue
+			edit { putFloat(key, migratedValue) }
+			migratedValue
+		}
+	}
+
+	private fun SharedPreferences.getLongCompat(
+		key: String,
+		defaultValue: Long,
+	): Long {
+		return try {
+			getLong(key, defaultValue)
+		} catch (_: ClassCastException) {
+			val migratedValue = when (val rawValue = all[key]) {
+				is Number -> rawValue.toLong()
+				is String -> rawValue.toLongOrNull()
+				else -> null
+			} ?: defaultValue
+			edit { putLong(key, migratedValue) }
+			migratedValue
 		}
 	}
 

@@ -120,7 +120,7 @@ class AutoFixService : CoroutineIntentService() {
 			if (replacement != null) {
 				notification.setLargeIcon(
 					coil.execute(
-						ImageRequest.Builder(this)
+						ImageRequest.Builder(applicationContext)
 							.data(replacement.coverUrl)
 							.mangaSourceExtra(replacement.source)
 							.build(),

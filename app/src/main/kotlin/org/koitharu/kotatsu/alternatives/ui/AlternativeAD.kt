@@ -85,7 +85,7 @@ fun alternativeAD(
 		)
 		binding.chipSource.also { chip ->
 			chip.text = item.manga.source.getTitle(chip.context)
-			ImageRequest.Builder(context)
+			ImageRequest.Builder(context.applicationContext)
 				.data(item.manga.source.faviconUri())
 				.lifecycle(lifecycleOwner)
 				.crossfade(false)

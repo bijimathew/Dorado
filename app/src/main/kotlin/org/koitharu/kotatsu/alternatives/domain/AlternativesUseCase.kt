@@ -1,16 +1,15 @@
 package org.koitharu.kotatsu.alternatives.domain
 
+import coil3.request.CachePolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import org.koitharu.kotatsu.core.model.MangaIdentityKey
-import org.koitharu.kotatsu.core.model.identityKeys
 import org.koitharu.kotatsu.core.model.identityName
-import org.koitharu.kotatsu.core.model.isSameStoredEntryAs
 import org.koitharu.kotatsu.core.model.unwrap
+import org.koitharu.kotatsu.core.parser.CachingMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.ext.toLocale
 import org.koitharu.kotatsu.explore.data.MangaSourcesRepository
@@ -38,13 +37,9 @@ class AlternativesUseCase @Inject constructor(
 		}
 		val semaphore = Semaphore(MAX_PARALLELISM)
 		return channelFlow {
-			val seen = HashSet<MangaIdentityKey>()
-			fun markSeen(keys: Set<MangaIdentityKey>): Boolean = synchronized(seen) {
-				var hasNew = false
-				for (key in keys) {
-					hasNew = seen.add(key) || hasNew
-				}
-				hasNew
+			val seen = HashSet<MangaStoredEntryKey>()
+			fun markSeen(key: MangaStoredEntryKey): Boolean = synchronized(seen) {
+				seen.add(key)
 			}
 			for (source in sources) {
 				launch {
@@ -55,22 +50,16 @@ class AlternativesUseCase @Inject constructor(
 						}
 					}.getOrNull()
 					list?.forEach { m ->
-						if (m.isSameStoredEntryAs(manga)) {
-							return@forEach
-						}
-						val rawKeys = m.identityKeys()
-						if (!markSeen(rawKeys)) {
+						val rawKey = m.storedEntryKey()
+						if (!markSeen(rawKey)) {
 							return@forEach
 						}
 						launch {
 							val details = runCatchingCancellable {
-								mangaRepositoryFactory.create(m.source).getDetails(m)
+								mangaRepositoryFactory.create(m.source).getAlternativeDetails(m, manga)
 							}.getOrDefault(m)
-							if (details.isSameStoredEntryAs(manga)) {
-								return@launch
-							}
-							val detailsKeys = details.identityKeys()
-							if (detailsKeys != rawKeys && !markSeen(detailsKeys)) {
+							val detailsKey = details.storedEntryKey()
+							if (detailsKey != rawKey && !markSeen(detailsKey)) {
 								return@launch
 							}
 							send(details)
@@ -79,6 +68,16 @@ class AlternativesUseCase @Inject constructor(
 				}
 			}
 		}
+	}
+
+	private fun Manga.storedEntryKey(): MangaStoredEntryKey {
+		val sourceName = source.unwrap().name
+		val value = if (id != 0L) {
+			"id:$id"
+		} else {
+			"url:$url\n$publicUrl"
+		}
+		return MangaStoredEntryKey(sourceName, value)
 	}
 
 	private suspend fun getSources(ref: MangaSource, disabled: Boolean): List<MangaSource> = buildList {
@@ -97,6 +96,15 @@ class AlternativesUseCase @Inject constructor(
 		}
 	}.distinctBy { it.unwrap().name }
 		.sortedByDescending { it.priority(ref) }
+
+	private suspend fun MangaRepository.getAlternativeDetails(candidate: Manga, ref: Manga): Manga {
+		val sameSource = candidate.source.unwrap().name == ref.source.unwrap().name
+		return if (sameSource && this is CachingMangaRepository) {
+			getDetails(candidate, CachePolicy.WRITE_ONLY)
+		} else {
+			getDetails(candidate)
+		}
+	}
 
 	private fun MangaSource.priority(ref: MangaSource): Int {
 		var res = 0
@@ -117,4 +125,9 @@ class AlternativesUseCase @Inject constructor(
 		}
 		return res
 	}
+
+	private data class MangaStoredEntryKey(
+		val sourceName: String,
+		val value: String,
+	)
 }

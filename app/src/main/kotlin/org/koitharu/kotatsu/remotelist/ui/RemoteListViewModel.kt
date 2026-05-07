@@ -47,6 +47,7 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.util.sizeOrZero
+import java.lang.ref.WeakReference
 import javax.inject.Inject
 
 private const val FILTER_MIN_INTERVAL = 250L
@@ -67,7 +68,7 @@ open class RemoteListViewModel @Inject constructor(
 	val source = MangaSource(savedStateHandle[RemoteListFragment.ARG_SOURCE])
 	val isRandomLoading = MutableStateFlow(false)
 	val onOpenManga = MutableEventFlow<Manga>()
-    val onSourceBroken = MutableEventFlow<Unit>()
+	val onSourceBroken = MutableEventFlow<Unit>()
 
 	protected val repository = mangaRepositoryFactory.create(source)
 	private val mangaList = MutableStateFlow<List<Manga>?>(null)
@@ -81,8 +82,11 @@ open class RemoteListViewModel @Inject constructor(
 	override val content = mutableContent
 
 	init {
+		val owner = WeakReference(this)
+		val contentState = mutableContent
+		val currentFilterCoordinator = filterCoordinator
 		contentJob = combine(
-			mangaList.map { it?.skipNsfwIfNeeded() },
+			mangaList.map { list -> owner.get()?.run { list?.skipNsfwIfNeeded() } },
 			observeListModeWithTriggers(),
 			listError,
 			hasNextPage,
@@ -92,14 +96,22 @@ open class RemoteListViewModel @Inject constructor(
 				mode = mode,
 				error = error,
 				hasNext = hasNext,
-				canResetFilter = filterCoordinator.isFilterApplied,
-				createEmptyState = ::createEmptyState,
-				mapMangaList = ::mapMangaList,
-				getFooter = ::getFooter,
-				onBuildList = ::onBuildList,
+				canResetFilter = currentFilterCoordinator.isFilterApplied,
+				createEmptyState = { canResetFilter ->
+					owner.get()?.createEmptyState(canResetFilter) ?: createRemoteListEmptyState(canResetFilter)
+				},
+				mapMangaList = { destination, manga, listMode ->
+					owner.get()?.mapMangaList(destination, manga, listMode) ?: Unit
+				},
+				getFooter = {
+					owner.get()?.getFooter()
+				},
+				onBuildList = { content ->
+					owner.get()?.onBuildList(content) ?: Unit
+				},
 			)
 		}.onEach { list ->
-			mutableContent.value = list
+			contentState.value = list
 		}.launchIn(viewModelScope + Dispatchers.Default)
 
 		filterCoordinator.observe()
@@ -175,12 +187,7 @@ open class RemoteListViewModel @Inject constructor(
 		}.also { loadingJob = it }
 	}
 
-	protected open fun createEmptyState(canResetFilter: Boolean) = EmptyState(
-		icon = R.drawable.ic_empty_common,
-		textPrimary = R.string.nothing_found,
-		textSecondary = 0,
-		actionStringRes = if (canResetFilter) R.string.reset_filter else 0,
-	)
+	protected open fun createEmptyState(canResetFilter: Boolean) = createRemoteListEmptyState(canResetFilter)
 
 	protected open suspend fun onBuildList(list: MutableList<ListModel>) = Unit
 
@@ -235,6 +242,13 @@ private suspend fun trackSourceUsage(
 ) {
 	sourcesRepository.trackUsage(source)
 }
+
+private fun createRemoteListEmptyState(canResetFilter: Boolean) = EmptyState(
+	icon = R.drawable.ic_empty_common,
+	textPrimary = R.string.nothing_found,
+	textSecondary = 0,
+	actionStringRes = if (canResetFilter) R.string.reset_filter else 0,
+)
 
 private suspend fun buildRemoteListContent(
 	list: List<Manga>?,

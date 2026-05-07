@@ -3,7 +3,9 @@ package org.koitharu.kotatsu.alternatives.domain
 import androidx.room.withTransaction
 import coil3.request.CachePolicy
 import org.koitharu.kotatsu.core.db.MangaDatabase
+import org.koitharu.kotatsu.core.db.migrations.MangaIdentityMerge
 import org.koitharu.kotatsu.core.model.getPreferredBranch
+import org.koitharu.kotatsu.core.model.isSameStoredEntryAs
 import org.koitharu.kotatsu.core.parser.CachingMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaDataRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
@@ -31,15 +33,15 @@ constructor(
 	suspend operator fun invoke(
 		oldManga: Manga,
 		newManga: Manga,
-	) {
+	): Manga {
 		val oldDetails = if (oldManga.chapters.isNullOrEmpty()) {
 			runCatchingCancellable {
 				mangaRepositoryFactory.create(oldManga.source).getDetails(oldManga)
 			}.getOrDefault(oldManga)
 		} else {
 			oldManga
-		}
-		val newDetails = if (newManga.chapters.isNullOrEmpty()) {
+		}.withStoredIdOf(oldManga)
+		val newDetails = if (newManga.chapters.isNullOrEmpty() || newManga.isSameStoredEntryAs(oldDetails)) {
 			mangaRepositoryFactory.create(newManga.source).getFreshDetails(newManga)
 		} else {
 			newManga
@@ -47,7 +49,7 @@ constructor(
 		mangaDataRepository.storeManga(newDetails, replaceExisting = true)
 		if (oldDetails.id == newDetails.id) {
 			progressUpdateUseCase(newDetails)
-			return
+			return newDetails
 		}
 		database.withTransaction {
 			// replace favorites
@@ -119,14 +121,23 @@ constructor(
 					)
 				}
 			}
+			MangaIdentityMerge.mergeManga(database.openHelper.writableDatabase, oldDetails.id, newDetails.id)
 		}
 		progressUpdateUseCase(newDetails)
+		return newDetails
 	}
 
 	private suspend fun MangaRepository.getFreshDetails(manga: Manga): Manga = if (this is CachingMangaRepository) {
 		getDetails(manga, CachePolicy.WRITE_ONLY)
 	} else {
 		getDetails(manga)
+	}
+
+	// Parser updates may re-key the loaded old details. Database rows still live under the stored seed id.
+	private fun Manga.withStoredIdOf(seed: Manga): Manga = if (id != seed.id && seed.id != 0L) {
+		copy(id = seed.id)
+	} else {
+		this
 	}
 
 	private fun makeNewHistory(

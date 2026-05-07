@@ -11,8 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -31,6 +33,7 @@ import org.koitharu.kotatsu.core.util.ext.MutableEventFlow
 import org.koitharu.kotatsu.core.util.ext.calculateTimeAgo
 import org.koitharu.kotatsu.core.util.ext.call
 import org.koitharu.kotatsu.core.util.ext.isEmpty
+import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.download.domain.DownloadState
 import org.koitharu.kotatsu.download.ui.list.chapters.DownloadChapter
 import org.koitharu.kotatsu.download.ui.worker.DownloadWorker
@@ -44,6 +47,7 @@ import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.util.mapToSet
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
+import java.lang.ref.WeakReference
 import java.util.LinkedList
 import java.util.UUID
 import javax.inject.Inject
@@ -61,32 +65,29 @@ class DownloadsViewModel @Inject constructor(
 	private val cacheMutex = Mutex()
 	private val expanded = MutableStateFlow(emptySet<UUID>())
 	private val chaptersCache = ArrayMap<UUID, StateFlow<List<DownloadChapter>?>>()
+	private val self = WeakReference(this)
 
 	private val works = combine(
 		workScheduler.observeWorks(),
 		expanded,
 	) { list, exp ->
-		list.toDownloadsList(exp)
-	}.withErrorHandling()
+		self.get()?.run { list.toDownloadsList(exp) }.orEmpty()
+	}.withErrorReporting(errorEvent)
 		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, null)
 
 	val onActionDone = MutableEventFlow<ReversibleAction>()
 
-	val items = works.map {
-		it?.toUiList() ?: listOf(LoadingState)
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
+	val items = works.map(::mapDownloadsContent)
+		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, listOf(LoadingState))
 
-	val hasPausedWorks = works.map {
-		it?.any { x -> x.canResume } == true
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
+	val hasPausedWorks = works.map(::hasPausedDownloads)
+		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
 
-	val hasActiveWorks = works.map {
-		it?.any { x -> x.canPause } == true
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
+	val hasActiveWorks = works.map(::hasActiveDownloads)
+		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
 
-	val hasCancellableWorks = works.map {
-		it?.any { x -> !x.workState.isFinished } == true
-	}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
+	val hasCancellableWorks = works.map(::hasCancellableDownloads)
+		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), false)
 
 	fun cancel(id: UUID) {
 		launchJob(Dispatchers.Default) {
@@ -209,45 +210,6 @@ class DownloadsViewModel @Inject constructor(
 		return list
 	}
 
-	private fun List<DownloadItemModel>.toUiList(): List<ListModel> {
-		if (isEmpty()) {
-			return emptyStateList()
-		}
-		val queued = LinkedList<ListModel>()
-		val running = LinkedList<ListModel>()
-		val destination = ArrayDeque<ListModel>((size * 1.4).toInt())
-		var prevDate: DateTimeAgo? = null
-		for (item in this) {
-			when (item.workState) {
-				WorkInfo.State.RUNNING -> running += item
-				WorkInfo.State.BLOCKED,
-				WorkInfo.State.ENQUEUED -> queued += item
-
-				else -> {
-					val date = calculateTimeAgo(item.timestamp)
-					if (prevDate != date) {
-						destination += if (date != null) {
-							ListHeader(date)
-						} else {
-							ListHeader(R.string.unknown)
-						}
-					}
-					prevDate = date
-					destination += item
-				}
-			}
-		}
-		if (running.isNotEmpty()) {
-			running.addFirst(ListHeader(R.string.in_progress))
-		}
-		destination.addAll(0, running)
-		if (queued.isNotEmpty()) {
-			queued.addFirst(ListHeader(R.string.queued))
-		}
-		destination.addAll(0, queued)
-		return destination
-	}
-
 	private suspend fun WorkInfo.toUiModel(isExpanded: Boolean): DownloadItemModel? {
 		val workData = outputData.takeUnless { it.isEmpty }
 			?: progress.takeUnless { it.isEmpty }
@@ -278,15 +240,6 @@ class DownloadsViewModel @Inject constructor(
 			chapters = chapters,
 		)
 	}
-
-	private fun emptyStateList() = listOf(
-		EmptyState(
-			icon = R.drawable.ic_empty_common,
-			textPrimary = R.string.text_downloads_list_holder,
-			textSecondary = 0,
-			actionStringRes = 0,
-		),
-	)
 
 	private suspend fun getManga(mangaId: Long): Manga? {
 		mangaCache[mangaId]?.let {
@@ -332,4 +285,73 @@ class DownloadsViewModel @Inject constructor(
 	private suspend fun tryLoad(manga: Manga) = runCatchingCancellable {
 		mangaRepositoryFactory.create(manga.source).getDetails(manga)
 	}.getOrNull()
+}
+
+private fun mapDownloadsContent(items: List<DownloadItemModel>?): List<ListModel> {
+	return items?.toDownloadsUiList() ?: listOf(LoadingState)
+}
+
+private fun hasPausedDownloads(items: List<DownloadItemModel>?): Boolean {
+	return items?.any { it.canResume } == true
+}
+
+private fun hasActiveDownloads(items: List<DownloadItemModel>?): Boolean {
+	return items?.any { it.canPause } == true
+}
+
+private fun hasCancellableDownloads(items: List<DownloadItemModel>?): Boolean {
+	return items?.any { !it.workState.isFinished } == true
+}
+
+private fun List<DownloadItemModel>.toDownloadsUiList(): List<ListModel> {
+	if (isEmpty()) {
+		return emptyDownloadsStateList()
+	}
+	val queued = LinkedList<ListModel>()
+	val running = LinkedList<ListModel>()
+	val destination = ArrayDeque<ListModel>((size * 1.4).toInt())
+	var prevDate: DateTimeAgo? = null
+	for (item in this) {
+		when (item.workState) {
+			WorkInfo.State.RUNNING -> running += item
+			WorkInfo.State.BLOCKED,
+			WorkInfo.State.ENQUEUED -> queued += item
+
+			else -> {
+				val date = calculateTimeAgo(item.timestamp)
+				if (prevDate != date) {
+					destination += if (date != null) {
+						ListHeader(date)
+					} else {
+						ListHeader(R.string.unknown)
+					}
+				}
+				prevDate = date
+				destination += item
+			}
+		}
+	}
+	if (running.isNotEmpty()) {
+		running.addFirst(ListHeader(R.string.in_progress))
+	}
+	destination.addAll(0, running)
+	if (queued.isNotEmpty()) {
+		queued.addFirst(ListHeader(R.string.queued))
+	}
+	destination.addAll(0, queued)
+	return destination
+}
+
+private fun emptyDownloadsStateList() = listOf(
+	EmptyState(
+		icon = R.drawable.ic_empty_common,
+		textPrimary = R.string.text_downloads_list_holder,
+		textSecondary = 0,
+		actionStringRes = 0,
+	),
+)
+
+private fun <T> Flow<T>.withErrorReporting(errorEvent: MutableEventFlow<Throwable>) = catch { error ->
+	error.printStackTraceDebug()
+	errorEvent.call(error)
 }

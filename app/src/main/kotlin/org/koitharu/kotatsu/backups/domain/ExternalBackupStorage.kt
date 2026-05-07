@@ -22,6 +22,10 @@ class ExternalBackupStorage @Inject constructor(
 	private val settings: AppSettings,
 ) {
 
+	private companion object {
+		const val MIME_ZIP = "application/zip"
+	}
+
 	suspend fun list(): List<BackupFile> = runInterruptible(Dispatchers.IO) {
 		getRootOrThrow().listFiles().mapNotNull {
 			if (it.isFile && it.canRead()) {
@@ -44,18 +48,28 @@ class ExternalBackupStorage @Inject constructor(
 	}.getOrNull()
 
 	suspend fun put(file: File): Uri = runInterruptible(Dispatchers.IO) {
-		val out = checkNotNull(
-			getRootOrThrow().createFile(
-				"application/zip",
-				file.nameWithoutExtension,
-			),
-		) {
-			"Cannot create target backup file"
-		}
-		checkNotNull(context.contentResolver.openOutputStream(out.uri, "wt")).sink().use { sink ->
-			file.source().buffer().use { src ->
-				src.readAll(sink)
+		val root = getRootOrThrow()
+		var created = false
+		val out = root.createFile(MIME_ZIP, file.name)?.also {
+			created = true
+		} ?: root.findWritableFile(file.name)
+			?: root.findWritableFile(file.nameWithoutExtension)
+			?: throw IllegalStateException(
+				"Cannot create target backup file ${file.name} in ${root.uri}",
+			)
+		try {
+			checkNotNull(context.contentResolver.openOutputStream(out.uri, "rwt")) {
+				"Cannot open target backup file for writing: ${out.uri}"
+			}.sink().use { sink ->
+				file.source().buffer().use { src ->
+					src.readAll(sink)
+				}
 			}
+		} catch (e: Throwable) {
+			if (created) {
+				out.delete()
+			}
+			throw e
 		}
 		out.uri
 	}
@@ -90,7 +104,16 @@ class ExternalBackupStorage @Inject constructor(
 		val uri = checkNotNull(settings.periodicalBackupDirectory) {
 			"Backup directory is not specified"
 		}
-		val root = DocumentFile.fromTreeUri(context, uri)
-		return checkNotNull(root) { "Cannot obtain DocumentFile from $uri" }
+		val root = checkNotNull(DocumentFile.fromTreeUri(context, uri)) {
+			"Cannot obtain DocumentFile from $uri"
+		}
+		check(root.exists()) { "Backup directory does not exist: $uri" }
+		check(root.isDirectory) { "Backup target is not a directory: $uri" }
+		check(root.canWrite()) { "Backup directory is not writable: $uri" }
+		return root
+	}
+
+	private fun DocumentFile.findWritableFile(name: String): DocumentFile? {
+		return findFile(name)?.takeIf { it.isFile && it.canWrite() }
 	}
 }

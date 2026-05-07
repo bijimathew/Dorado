@@ -132,7 +132,7 @@ class ImageActivity : BaseActivity<ActivityImageBinding>(),
 		if (isAnimated) {
 			viewBinding.ssiv.isVisible = false
 			viewBinding.animatedView.isVisible = true
-			ImageRequest.Builder(this)
+			ImageRequest.Builder(applicationContext)
 				.data(intent.data)
 				.memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
 				.memoryCachePolicy(CachePolicy.READ_ONLY)
@@ -144,7 +144,7 @@ class ImageActivity : BaseActivity<ActivityImageBinding>(),
 		} else {
 			viewBinding.ssiv.isVisible = true
 			viewBinding.animatedView.isVisible = false
-			ImageRequest.Builder(this)
+			ImageRequest.Builder(applicationContext)
 				.data(intent.data)
 				.memoryCacheKey(intent.getParcelableExtraCompat<CoilMemoryCacheKey>(AppRouter.KEY_PREVIEW)?.data)
 				.memoryCachePolicy(CachePolicy.READ_ONLY)

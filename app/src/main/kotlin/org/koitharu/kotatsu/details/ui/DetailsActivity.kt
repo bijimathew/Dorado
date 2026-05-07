@@ -481,7 +481,7 @@ class DetailsActivity :
 				textViewSourceLabel.isVisible = textViewSource.isVisible == true
 			}
 			val faviconPlaceholderFactory = FaviconDrawable.Factory(R.style.FaviconDrawable_Chip)
-			ImageRequest.Builder(this@DetailsActivity)
+			ImageRequest.Builder(applicationContext)
 				.data(manga.source.faviconUri())
 				.lifecycle(this@DetailsActivity)
 				.crossfade(false)
