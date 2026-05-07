@@ -42,9 +42,13 @@
 -keepattributes EnclosingMethod
 -keepattributes RuntimeVisibleAnnotations
 -keepattributes RuntimeVisibleParameterAnnotations
+-keepattributes AnnotationDefault
+-keepattributes *Annotation*
+-keepattributes kotlin.Metadata
 
 -keep class eu.kanade.tachiyomi.** { *; }
 -keep interface eu.kanade.tachiyomi.** { *; }
+-keeppackagenames eu.kanade.tachiyomi.**
 -keepclassmembers class eu.kanade.tachiyomi.** {
     public <init>(...);
     public protected *;
@@ -52,10 +56,14 @@
 
 -keep class uy.kohesive.injekt.** { *; }
 -keep interface uy.kohesive.injekt.** { *; }
+-keeppackagenames uy.kohesive.injekt.**
 -keepclassmembers class uy.kohesive.injekt.** {
     public <init>(...);
     public protected *;
 }
+
+-keep class org.koitharu.kotatsu.core.parser.mihon.** { *; }
+-keeppackagenames org.koitharu.kotatsu.core.parser.mihon.**
 
 -keep class rx.** { *; }
 -keep interface rx.** { *; }
@@ -63,11 +71,13 @@
 
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
+-keeppackagenames okhttp3.**
 -keepclassmembers class okhttp3.** {
     public <init>(...);
 }
 -keep class okio.** { *; }
 -keep interface okio.** { *; }
+-keeppackagenames okio.**
 -dontwarn okio.**
 -dontwarn okhttp3.**
 
@@ -76,12 +86,15 @@
 # link against the host app's stdlib/coroutines/serialization artifacts.
 -keep class kotlin.** { *; }
 -keep interface kotlin.** { *; }
+-keep class kotlin.Metadata { *; }
+-keeppackagenames kotlin.**
 -dontwarn kotlin.**
 
 -keep class kotlin.reflect.** { *; }
 -dontwarn kotlin.reflect.**
 
 -keep class kotlinx.serialization.** { *; }
+-keeppackagenames kotlinx.serialization.**
 -keepclassmembers class kotlinx.serialization.** { *; }
 -keepclasseswithmembers class * {
     @kotlinx.serialization.Serializable <methods>;
@@ -95,4 +108,5 @@
 -dontwarn kotlinx.serialization.**
 
 -keep class kotlinx.coroutines.** { *; }
+-keeppackagenames kotlinx.coroutines.**
 -dontwarn kotlinx.coroutines.**
