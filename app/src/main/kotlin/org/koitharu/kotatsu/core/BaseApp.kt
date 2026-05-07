@@ -22,6 +22,8 @@ import org.acra.sender.HttpSender
 import org.conscrypt.Conscrypt
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.crash.GlobalCrashHandler
+import org.koitharu.kotatsu.core.crash.isCrashProcess
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.os.AppValidator
 import org.koitharu.kotatsu.core.os.RomCompat
@@ -75,10 +77,14 @@ open class BaseApp : Application(), Configuration.Provider {
 
 	override fun onCreate() {
 		super.onCreate()
-		PlatformRegistry.applicationContext = this // TODO replace with OkHttp.initialize
+		if (isCrashProcess()) {
+			return
+		}
 		if (ACRA.isACRASenderServiceProcess()) {
 			return
 		}
+		PlatformRegistry.applicationContext = this // TODO replace with OkHttp.initialize
+		GlobalCrashHandler.install(this)
 		AppCompatDelegate.setDefaultNightMode(settings.theme)
 		// TLS 1.3 support for Android < 10
 		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -100,6 +106,9 @@ open class BaseApp : Application(), Configuration.Provider {
 
 	override fun attachBaseContext(base: Context) {
 		super.attachBaseContext(base)
+		if (isCrashProcess()) {
+			return
+		}
 		if (ACRA.isACRASenderServiceProcess()) {
 			return
 		}

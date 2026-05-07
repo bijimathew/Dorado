@@ -20,23 +20,25 @@ import java.io.EOFException
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.Inet6Address
-import java.net.InetSocketAddress
 import java.net.ConnectException
+import java.net.Inet6Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ProtocolException
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.nio.charset.StandardCharsets
 import kotlin.math.min
+import kotlin.random.Random
 
 class BypassProxyServer(
 	private val settings: AppSettings,
 	cache: Cache,
 ) {
+
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 	private val strictDnsResolver = DoHManager(cache, settings, false)
+	private val googleDnsResolver = DoHManager(cache, settings, false, DoHProvider.GOOGLE)
 	private val cloudflareDnsResolver = DoHManager(cache, settings, false, DoHProvider.CLOUDFLARE)
 	private val lock = Any()
 
@@ -50,10 +52,10 @@ class BypassProxyServer(
 				return active.localPort
 			}
 			stopLocked()
-			val port = runCatching {
+			return runCatching {
 				val server = ServerSocket()
 				server.reuseAddress = true
-				server.bind(InetSocketAddress(LOOPBACK_IPV4, BYPASS_PORT))
+				server.bind(InetSocketAddress(LOOPBACK_HOST, RANDOM_PORT))
 				serverSocket = server
 				scope.launch {
 					runAcceptLoop(server)
@@ -62,7 +64,6 @@ class BypassProxyServer(
 			}.getOrElse {
 				throw ProxyConfigException()
 			}
-			return port
 		}
 	}
 
@@ -91,6 +92,9 @@ class BypassProxyServer(
 
 	private suspend fun handleClient(client: Socket) {
 		client.use { socket ->
+			if (!socket.inetAddress.isLoopbackAddress) {
+				return
+			}
 			runCatching {
 				socket.tcpNoDelay = true
 				socket.soTimeout = 0
@@ -113,15 +117,23 @@ class BypassProxyServer(
 	}
 
 	private suspend fun handleConnectTunnel(target: String, clientInput: InputStream, clientOutput: OutputStream) {
-		val targetUrl = "https://$target".toHttpUrlOrNull() ?: return
+		val targetUrl = "https://$target".toHttpUrlOrNull() ?: run {
+			clientOutput.write(httpResponse(400))
+			clientOutput.flush()
+			return
+		}
 		val remote = runCatching {
 			connectRemote(targetUrl.host, targetUrl.port)
-		}.getOrElse { return }
+		}.getOrElse {
+			clientOutput.write(httpResponse(503))
+			clientOutput.flush()
+			return
+		}
 		remote.use { socket ->
 			socket.soTimeout = 0
 			val remoteInput = BufferedInputStream(socket.getInputStream())
 			val remoteOutput = socket.getOutputStream()
-			clientOutput.write(CONNECT_OK_RESPONSE)
+			clientOutput.write(httpResponse(200))
 			clientOutput.flush()
 			coroutineScope {
 				val downlink = launch(Dispatchers.IO) {
@@ -149,10 +161,17 @@ class BypassProxyServer(
 			val host = request.getHeaderValue("Host") ?: throw ProtocolException()
 			"http://$host$target".toHttpUrlOrNull() ?: throw ProtocolException()
 		}
-		connectRemote(targetUrl.host, targetUrl.port).use { remote ->
-			remote.soTimeout = READ_TIMEOUT_MS
-			val remoteInput = BufferedInputStream(remote.getInputStream())
-			val remoteOutput = BufferedOutputStream(remote.getOutputStream())
+		val remote = runCatching {
+			connectRemote(targetUrl.host, targetUrl.port)
+		}.getOrElse {
+			clientOutput.write(httpResponse(503))
+			clientOutput.flush()
+			return
+		}
+		remote.use { socket ->
+			socket.soTimeout = READ_TIMEOUT_MS
+			val remoteInput = BufferedInputStream(socket.getInputStream())
+			val remoteOutput = BufferedOutputStream(socket.getOutputStream())
 			writeHttpForwardRequest(method, version, targetUrl, request, remoteOutput)
 			val bodyLength = request.getHeaderValue("Content-Length")?.trim()?.toLongOrNull()
 			if (bodyLength != null && bodyLength > 0L) {
@@ -177,8 +196,8 @@ class BypassProxyServer(
 			.append(' ')
 			.append(version)
 			.append("\r\n")
-			.append("Host: ")
-			.append(buildHostHeader(url))
+			.append("hOSt: ")
+			.append(buildHostHeader(url, trailingDot = true))
 			.append("\r\n")
 
 		request.headers
@@ -192,16 +211,18 @@ class BypassProxyServer(
 					.append("\r\n")
 			}
 		headBuilder.append("Connection: close\r\n\r\n")
-		output.write(headBuilder.toString().toByteArray(StandardCharsets.ISO_8859_1))
+		output.write(headBuilder.toString().toByteArray(Charsets.ISO_8859_1))
 	}
 
 	private fun connectRemote(host: String, port: Int): Socket {
-		val resolver = if (settings.dnsOverHttps == DoHProvider.NONE) cloudflareDnsResolver else strictDnsResolver
-		val addresses = LinkedHashSet(resolver.lookup(host))
+		val addresses = lookupAddresses(host)
 		if (addresses.isEmpty()) {
 			throw UnknownHostException(host)
 		}
-		val ordered = addresses.sortedBy { it is Inet6Address }
+		val ordered = addresses.sortedWith(
+			compareBy<InetAddress> { it is Inet6Address }
+				.thenBy { it.hostAddress },
+		)
 		var lastError: IOException? = null
 		for (address in ordered) {
 			val socket = Socket()
@@ -217,14 +238,38 @@ class BypassProxyServer(
 		throw lastError ?: ConnectException()
 	}
 
+	private fun lookupAddresses(host: String): List<InetAddress> {
+		val addresses = LinkedHashSet<InetAddress>()
+		val resolvers = if (settings.dnsOverHttps == DoHProvider.NONE) {
+			listOf(googleDnsResolver, cloudflareDnsResolver)
+		} else {
+			listOf(strictDnsResolver, googleDnsResolver, cloudflareDnsResolver)
+		}
+		resolvers.forEach { resolver ->
+			runCatching {
+				resolver.lookup(host)
+			}.getOrNull()
+				?.filterTo(addresses) { it.isProxyTargetAddress() }
+		}
+		if (addresses.isEmpty()) {
+			runCatching {
+				InetAddress.getAllByName(host).asList()
+			}.getOrNull()
+				?.filterTo(addresses) { it.isProxyTargetAddress() }
+		}
+		return addresses.toList()
+	}
+
+	private fun InetAddress.isProxyTargetAddress(): Boolean {
+		return !isAnyLocalAddress && !isLoopbackAddress && !isLinkLocalAddress && !isMulticastAddress
+	}
+
 	private fun pipeClientToServer(clientInput: InputStream, remoteOutput: OutputStream) {
 		val buffer = ByteArray(BUFFER_SIZE)
 		var firstChunkHandled = false
 		while (true) {
 			val count = try {
 				clientInput.read(buffer)
-			} catch (_: SocketTimeoutException) {
-				return
 			} catch (_: IOException) {
 				return
 			}
@@ -292,12 +337,12 @@ class BypassProxyServer(
 		if (firstSplit > 0) {
 			output.write(buffer, 0, firstSplit)
 			output.flush()
-			Thread.sleep(SPLIT_WRITE_DELAY_MS)
+			sleepSplitDelay()
 		}
 		if (splitPosition > firstSplit) {
 			output.write(buffer, firstSplit, splitPosition - firstSplit)
 			output.flush()
-			Thread.sleep(SPLIT_WRITE_DELAY_MS)
+			sleepSplitDelay()
 		}
 		output.write(buffer, splitPosition, count - splitPosition)
 		output.flush()
@@ -375,7 +420,7 @@ class BypassProxyServer(
 		if (state != 4) {
 			throw EOFException("HTTP headers are too large")
 		}
-		val requestText = String(raw, 0, count, StandardCharsets.ISO_8859_1)
+		val requestText = String(raw, 0, count, Charsets.ISO_8859_1)
 		val lines = requestText.split("\r\n")
 		val requestLine = lines.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
 		val headers = lines.asSequence()
@@ -422,13 +467,36 @@ class BypassProxyServer(
 		return "$path?$query"
 	}
 
-	private fun buildHostHeader(url: HttpUrl): String {
-		val defaultPort = if (url.scheme == "https") 443 else 80
-		return if (url.port == defaultPort) url.host else "${url.host}:${url.port}"
+	private fun buildHostHeader(url: HttpUrl, trailingDot: Boolean): String {
+		val defaultPort = if (url.scheme == "https") HTTPS_PORT else HTTP_PORT
+		val host = formatHost(url.host, trailingDot)
+		return if (url.port == defaultPort) host else "$host:${url.port}"
+	}
+
+	private fun formatHost(host: String, trailingDot: Boolean): String {
+		return when {
+			host.indexOf(':') >= 0 -> "[$host]"
+			trailingDot && !host.endsWith('.') -> "$host."
+			else -> host
+		}
+	}
+
+	private fun httpResponse(code: Int): ByteArray {
+		val reason = when (code) {
+			200 -> "Connection Established"
+			400 -> "Bad Request"
+			503 -> "Service Unavailable"
+			else -> "Proxy Response"
+		}
+		return "HTTP/1.1 $code $reason\r\n\r\n".toByteArray(Charsets.ISO_8859_1)
 	}
 
 	private fun readU16(data: ByteArray, offset: Int): Int {
 		return ((data[offset].toInt() and 0xFF) shl 8) or (data[offset + 1].toInt() and 0xFF)
+	}
+
+	private fun sleepSplitDelay() {
+		Thread.sleep(Random.nextLong(SPLIT_WRITE_DELAY_MIN_MS, SPLIT_WRITE_DELAY_MAX_MS + 1))
 	}
 
 	private fun ServerSocket.closeQuietly() {
@@ -452,17 +520,20 @@ class BypassProxyServer(
 	)
 
 	companion object {
-		private const val LOOPBACK_IPV4 = "127.0.0.1"
-		private const val BYPASS_PORT = 10808
+		private const val LOOPBACK_HOST = "127.0.0.1"
+		private const val RANDOM_PORT = 0
 		private const val METHOD_CONNECT = "CONNECT"
 		private const val HTTP_1_1 = "HTTP/1.1"
+		private const val HTTP_PORT = 80
+		private const val HTTPS_PORT = 443
 		private const val MAX_HEADER_BYTES = 32 * 1024
 		private const val BUFFER_SIZE = 8192
 		private const val CONNECT_TIMEOUT_MS = 10_000
 		private const val READ_TIMEOUT_MS = 30_000
 		private const val TLS_RECORD_HEADER_SIZE = 5
 		private const val DEFAULT_SPLIT_POSITION = 1
-		private const val SPLIT_WRITE_DELAY_MS = 80L
+		private const val SPLIT_WRITE_DELAY_MIN_MS = 30L
+		private const val SPLIT_WRITE_DELAY_MAX_MS = 80L
 		private const val MAX_CLIENT_HELLO_BYTES = 32 * 1024
 		private const val FIRST_PACKET_ACCUMULATION_MAX_WAIT_MS = 120L
 		private const val FIRST_PACKET_ACCUMULATION_STEP_MS = 8L
@@ -470,7 +541,5 @@ class BypassProxyServer(
 		private const val TLS_VERSION_PREFIX: Byte = 0x03
 		private const val TLS_CLIENT_HELLO_TYPE = 0x01
 		private const val TLS_EXT_SERVER_NAME = 0x0000
-		private val CONNECT_OK_RESPONSE = "HTTP/1.1 200 Connection Established\r\n\r\n"
-			.toByteArray(StandardCharsets.ISO_8859_1)
 	}
 }

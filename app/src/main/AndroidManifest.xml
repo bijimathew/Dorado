@@ -495,6 +495,19 @@
 				android:name="android.appwidget.provider"
 				android:resource="@xml/widget_recent" />
 		</receiver>
+		<activity
+			android:name="org.koitharu.kotatsu.core.crash.CrashDialogActivity"
+			android:excludeFromRecents="true"
+			android:exported="false"
+			android:finishOnTaskLaunch="true"
+			android:noHistory="true"
+			android:process=":crash"
+			android:theme="@style/Theme.Kotatsu" />
+		<service
+			android:name="org.koitharu.kotatsu.core.crash.CrashService"
+			android:exported="false"
+			android:foregroundServiceType="dataSync"
+			android:process=":crash" />
 		<receiver
 			android:name="org.koitharu.kotatsu.core.ErrorReporterReceiver"
 			android:exported="false">

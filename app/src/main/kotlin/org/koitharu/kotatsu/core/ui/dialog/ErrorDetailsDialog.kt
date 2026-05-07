@@ -8,6 +8,7 @@ import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
+import org.koitharu.kotatsu.core.crash.CrashReportFormatter
 import org.koitharu.kotatsu.core.github.AppUpdateRepository
 import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.router
@@ -64,7 +65,10 @@ class ErrorDetailsDialog : AlertDialogFragment<DialogErrorDetailsBinding>(), Vie
 			.setNegativeButton(R.string.close, null)
 			.setTitle(R.string.error_details)
 			.setNeutralButton(androidx.preference.R.string.copy) { _, _ ->
-				context?.copyToClipboard(getString(R.string.error), exception.stackTraceToString())
+				context?.let {
+					val report = CrashReportFormatter.build(it, exception, Thread.currentThread().name)
+					it.copyToClipboard(getString(R.string.error), report.body)
+				}
 			}
 		if (appUpdateRepository.isUpdateAvailable) {
 			builder.setPositiveButton(R.string.update) { _, _ ->
@@ -73,8 +77,11 @@ class ErrorDetailsDialog : AlertDialogFragment<DialogErrorDetailsBinding>(), Vie
 			}
 		} else if (exception.isReportable()) {
 			builder.setPositiveButton(R.string.report) { _, _ ->
-				context?.copyToClipboard(getString(R.string.error), exception.stackTraceToString())
-				router.openExternalBrowser(getString(R.string.url_error_report), getString(R.string.report))
+				val report = context?.let {
+					CrashReportFormatter.build(it, exception, Thread.currentThread().name)
+				}
+				context?.copyToClipboard(getString(R.string.error), report?.body ?: exception.stackTraceToString())
+				router.openExternalBrowser(report?.issueUrl ?: getString(R.string.url_error_report), getString(R.string.report))
 				dismiss()
 			}
 		}

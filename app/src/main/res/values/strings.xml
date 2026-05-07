@@ -273,6 +273,12 @@
     <string name="disable_battery_optimization">Disable battery optimization</string>
     <string name="disable_battery_optimization_summary">Helps with background updates checks</string>
     <string name="crash_text">Something went wrong. Please submit a bug report to the developers to help us fix it.</string>
+    <string name="crash_dialog_message">Kaisoku crashed. The crash report was copied to the clipboard. Open GitHub Issues and paste the crash message or stack trace there if the form is not filled automatically.</string>
+    <string name="copy_crash_report">Copy report</string>
+    <string name="crash_report_copied">Crash report copied</string>
+    <string name="open_github_issues">Open GitHub Issues</string>
+    <string name="crash_notification_text">Preparing crash report</string>
+    <string name="crash_report_channel">Crash reports</string>
     <string name="send">Send</string>
     <string name="status_planned">Planned</string>
     <string name="status_reading">Reading</string>
