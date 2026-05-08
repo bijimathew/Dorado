@@ -1,0 +1,7 @@
+Add dynamic parser plugin support with local JAR import, GitHub release import/update, plugin source settings, and catalog integration.
+Add a Plugins source-catalog filter and make Extensions/Plugins filters tri-state: include, exclude, neutral.
+Add a crash dialog/service that copies a crash report and opens a prefilled GitHub issue.
+Refactor the censorship-bypass proxy with ephemeral loopback binding, safer DNS fallback, unsafe-target filtering, and clearer proxy errors.
+Add the suggested Keiyoushi Mihon extension repository shortcut.
+Refresh parser support with reviewed source fixes/new sources, Com-X mobile guard handling, and a parser callback leak fix.
+Harden manga alternatives matching and Mihon bridge release rules.
