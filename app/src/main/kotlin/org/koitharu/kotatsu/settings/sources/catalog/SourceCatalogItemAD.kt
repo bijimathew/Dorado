@@ -7,6 +7,7 @@ import com.hannesdorfmann.adapterdelegates4.dsl.adapterDelegateViewBinding
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.getSummary
 import org.koitharu.kotatsu.core.model.getTitle
+import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.ui.image.FaviconDrawable
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
 import org.koitharu.kotatsu.core.util.ext.drawableStart
@@ -48,6 +49,7 @@ fun sourceCatalogItemSourceAD(
 		binding.textViewDescription.drawableStart = when {
 			parserSource?.isBroken == true -> ContextCompat.getDrawable(context, R.drawable.ic_off_small)
 			item.source is MihonMangaSource -> ContextCompat.getDrawable(context, R.drawable.ic_sync)
+			item.source is PluginMangaSource -> ContextCompat.getDrawable(context, R.drawable.ic_services)
 			else -> null
 		}
 		binding.imageViewIcon.setImageAsync(item.source, cacheOnly = true)

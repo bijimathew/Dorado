@@ -14,6 +14,7 @@ import org.koitharu.kotatsu.core.network.cookies.MutableCookieJar
 import org.koitharu.kotatsu.core.parser.CachingMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
+import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.prefs.SourceSettings
 import org.koitharu.kotatsu.core.ui.BaseViewModel
 import org.koitharu.kotatsu.core.ui.util.ReversibleAction
@@ -49,12 +50,20 @@ class SourceSettingsViewModel @Inject constructor(
 				repository.getConfig().subscribe(this)
 				loadUsername(repository.getAuthProvider())
 			}
+			is PluginMangaRepository -> {
+				browserUrl.value = "https://${repository.domain}"
+				repository.getConfig().subscribe(this)
+				loadUsername(repository.getAuthProvider())
+			}
 		}
 	}
 
 	override fun onCleared() {
 		when (repository) {
 			is ParserMangaRepository -> {
+				repository.getConfig().unsubscribe(this)
+			}
+			is PluginMangaRepository -> {
 				repository.getConfig().unsubscribe(this)
 			}
 		}
@@ -71,25 +80,40 @@ class SourceSettingsViewModel @Inject constructor(
 			if (key == SourceSettings.KEY_DOMAIN) {
 				browserUrl.value = "https://${repository.domain}"
 			}
+		} else if (repository is PluginMangaRepository) {
+			if (key == SourceSettings.KEY_DOMAIN) {
+				browserUrl.value = "https://${repository.domain}"
+			}
 		}
 	}
 
 	fun onResume() {
-		if (usernameLoadJob?.isActive != true && repository is ParserMangaRepository) {
-			loadUsername(repository.getAuthProvider())
+		if (usernameLoadJob?.isActive == true) {
+			return
+		}
+		when (repository) {
+			is ParserMangaRepository -> loadUsername(repository.getAuthProvider())
+			is PluginMangaRepository -> loadUsername(repository.getAuthProvider())
 		}
 	}
 
 	fun clearCookies() {
-		if (repository !is ParserMangaRepository) return
+		val domain = when (repository) {
+			is ParserMangaRepository -> repository.domain
+			is PluginMangaRepository -> repository.domain
+			else -> return
+		}
 		launchLoadingJob(Dispatchers.Default) {
 			val url = HttpUrl.Builder()
 				.scheme("https")
-				.host(repository.domain)
+				.host(domain)
 				.build()
 			cookieJar.removeCookies(url, null)
 			onActionDone.call(ReversibleAction(R.string.cookies_cleared, null))
-			loadUsername(repository.getAuthProvider())
+			when (repository) {
+				is ParserMangaRepository -> loadUsername(repository.getAuthProvider())
+				is PluginMangaRepository -> loadUsername(repository.getAuthProvider())
+			}
 		}
 	}
 

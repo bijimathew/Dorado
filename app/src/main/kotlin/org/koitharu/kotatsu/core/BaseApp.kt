@@ -27,6 +27,8 @@ import org.koitharu.kotatsu.core.crash.isCrashProcess
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.os.AppValidator
 import org.koitharu.kotatsu.core.os.RomCompat
+import org.koitharu.kotatsu.core.parser.DynamicParserManager
+import org.koitharu.kotatsu.core.parser.PluginFileLoader
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.work.AppWorkerFactory
 import org.koitharu.kotatsu.core.util.ext.processLifecycleScope
@@ -100,6 +102,9 @@ open class BaseApp : Application(), Configuration.Provider {
 		processLifecycleScope.launch(Dispatchers.Default) {
 			setupDatabaseObservers()
 			localStorageChanges.collect(localMangaIndexProvider.get())
+		}
+		processLifecycleScope.launch(Dispatchers.IO) {
+			DynamicParserManager.loadParsersFromDirectory(this@BaseApp, PluginFileLoader.pluginsDir(this@BaseApp))
 		}
 		workScheduleManager.init()
 	}

@@ -213,6 +213,9 @@
     <string name="enabled">Enabled</string>
     <string name="disabled">Disabled</string>
     <string name="extensions">Extensions</string>
+    <string name="no_extensions">No extensions</string>
+    <string name="plugins">Plugins</string>
+    <string name="no_plugins">No plugins</string>
     <string name="reset_filter">Reset filter</string>
     <string name="enter_name">Enter name</string>
     <string name="pinned_sources_only">Pinned sources only</string>
@@ -535,6 +538,7 @@
     <string name="add_mihon_sources_from_link">Add Mihon sources from link</string>
     <string name="add_extension_repo">Add extension repository</string>
     <string name="extension_repo_url">Repository link</string>
+    <string name="use_suggested_repo">Use suggested</string>
     <string name="extension_repo_added">Extension repository added</string>
     <string name="extension_repo_removed">Extension repository removed</string>
     <string name="invalid_extension_repo">Invalid extension repository link</string>
@@ -961,4 +965,25 @@
     <string name="confirm_password">Confirm password</string>
     <string name="password_reset">Password reset successfully</string>
     <string name="no_reset_token">No reset token provided</string>
+    <string name="manage_plugins">Manage plugins</string>
+    <string name="no_plugins_installed">No plugins installed</string>
+    <string name="no_plugins_summary">Use the import action to add parser plugin JAR files.</string>
+    <string name="load_success">Plugin imported and loaded successfully</string>
+    <string name="load_failed">Failed to load plugin</string>
+    <string name="load_from_storage">Import from local storage</string>
+    <string name="load_storage_summary">Choose a parser plugin JAR file</string>
+    <string name="import_from_github">Import from GitHub</string>
+    <string name="import_github_summary">Download the latest JAR asset from a GitHub release</string>
+    <string name="set_plugin_name">Set name for this plugin</string>
+    <string name="plugin_name">Plugin name</string>
+    <string name="overwrite_plugin">Overwrite plugin?</string>
+    <string name="overwrite_plugin_summary">A plugin file named %1$s is already installed. Replace it with this one?</string>
+    <string name="delete_plugin">Delete plugin</string>
+    <string name="confirm_delete_plugin">Are you sure you want to delete %1$s?</string>
+    <string name="deleted_plugin">Deleted %1$s plugin</string>
+    <string name="plugin_not_found">Plugin source %1$s was not found</string>
+    <string name="jar_not_loaded">Plugin JAR %1$s is not loaded</string>
+    <string name="unknown_source">Unknown source %1$s</string>
+    <string name="missing_in_plugin">Source %1$s is missing from the plugin</string>
+    <string name="loaded_null">Plugin factory returned an empty parser</string>
 </resources>

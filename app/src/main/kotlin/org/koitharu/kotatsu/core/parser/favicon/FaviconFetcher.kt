@@ -31,6 +31,7 @@ import org.koitharu.kotatsu.core.model.MangaSource
 import org.koitharu.kotatsu.core.parser.EmptyMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
+import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.util.MimeTypes
 import org.koitharu.kotatsu.core.util.ext.faviconCacheOnlyKey
@@ -59,6 +60,7 @@ class FaviconFetcher(
 
 		return when (val repo = mangaRepositoryFactory.create(mangaSource)) {
 			is ParserMangaRepository -> fetchParserFavicon(repo)
+			is PluginMangaRepository -> fetchPluginParserFavicon(repo)
 			is ExternalMangaRepository -> fetchPluginIcon(repo)
 			is EmptyMangaRepository -> ImageFetchResult(
 				image = ColorImage(Color.WHITE),
@@ -77,11 +79,26 @@ class FaviconFetcher(
 	}
 
 	private suspend fun fetchParserFavicon(repository: ParserMangaRepository): FetchResult {
+		return fetchParserFavicons(repository.source.name) {
+			repository.getFavicons()
+		}
+	}
+
+	private suspend fun fetchPluginParserFavicon(repository: PluginMangaRepository): FetchResult {
+		return fetchParserFavicons(repository.source.name) {
+			repository.getFavicons()
+		}
+	}
+
+	private suspend fun fetchParserFavicons(
+		sourceName: String,
+		getFavicons: suspend () -> org.koitharu.kotatsu.parsers.model.Favicons,
+	): FetchResult {
 		val sizePx = maxOf(
 			options.size.width.pxOrElse { FALLBACK_SIZE },
 			options.size.height.pxOrElse { FALLBACK_SIZE },
 		)
-		val cacheKey = options.diskCacheKey ?: "${repository.source.name}_$sizePx"
+		val cacheKey = options.diskCacheKey ?: "${sourceName}_$sizePx"
 		if (options.diskCachePolicy.readEnabled) {
 			localStorageCache[cacheKey]?.let { file ->
 				return SourceFetchResult(
@@ -92,9 +109,9 @@ class FaviconFetcher(
 			}
 		}
 		if (options.extras[faviconCacheOnlyKey] == true) {
-			throw NoSuchElementException("No cached favicon for ${repository.source.name}")
+			throw NoSuchElementException("No cached favicon for $sourceName")
 		}
-		var favicons = repository.getFavicons()
+		var favicons = getFavicons()
 		var lastError: Exception? = null
 		while (favicons.isNotEmpty()) {
 			currentCoroutineContext().ensureActive()

@@ -103,7 +103,8 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		when (data) {
 			is ContentType -> viewModel.setContentType(data, !chip.isChecked)
 			is Boolean -> viewModel.setNewOnly(!chip.isChecked)
-			is SourcesCatalogChip -> viewModel.setMihonOnly(!chip.isChecked)
+			SourcesCatalogChip.Mihon -> viewModel.cycleMihonMode()
+			SourcesCatalogChip.Plugin -> viewModel.cyclePluginMode()
 			else -> showLocalesMenu(chip)
 		}
 	}
@@ -133,7 +134,7 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		hasNewSources: Boolean,
 		contentTypes: List<ContentType>,
 	) {
-		val chips = ArrayList<ChipModel>(contentTypes.size + 2)
+		val chips = ArrayList<ChipModel>(contentTypes.size + 3)
 		chips += ChipModel(
 			title = appliedFilter.locale?.toLocale().getDisplayName(this),
 			icon = R.drawable.ic_language,
@@ -148,10 +149,24 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 			)
 		}
 		chips += ChipModel(
-			title = getString(R.string.extensions),
-			icon = R.drawable.ic_sync,
-			isChecked = appliedFilter.isMihonOnly,
+			title = appliedFilter.mihonMode.sourceKindTitle(
+				includedTitle = getString(R.string.extensions),
+				excludedTitle = getString(R.string.no_extensions),
+			),
+			icon = appliedFilter.mihonMode.sourceKindIcon(R.drawable.ic_sync),
+			isChecked = appliedFilter.mihonMode == SourceCatalogFilterMode.INCLUDE,
+			tint = appliedFilter.mihonMode.sourceKindTint(),
 			data = SourcesCatalogChip.Mihon,
+		)
+		chips += ChipModel(
+			title = appliedFilter.pluginMode.sourceKindTitle(
+				includedTitle = getString(R.string.plugins),
+				excludedTitle = getString(R.string.no_plugins),
+			),
+			icon = appliedFilter.pluginMode.sourceKindIcon(R.drawable.ic_services),
+			isChecked = appliedFilter.pluginMode == SourceCatalogFilterMode.INCLUDE,
+			tint = appliedFilter.pluginMode.sourceKindTint(),
+			data = SourcesCatalogChip.Plugin,
 		)
 		contentTypes.mapTo(chips) { type ->
 			ChipModel(
@@ -165,6 +180,7 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 
 	private enum class SourcesCatalogChip {
 		Mihon,
+		Plugin,
 	}
 
 	private fun showLocalesMenu(anchor: View) {
@@ -182,4 +198,19 @@ class SourcesCatalogActivity : BaseActivity<ActivitySourcesCatalogBinding>(),
 		}
 		menu.show()
 	}
+}
+
+private fun SourceCatalogFilterMode.sourceKindTitle(
+	includedTitle: String,
+	excludedTitle: String,
+): String = if (this == SourceCatalogFilterMode.EXCLUDE) excludedTitle else includedTitle
+
+private fun SourceCatalogFilterMode.sourceKindIcon(defaultIcon: Int): Int = when (this) {
+	SourceCatalogFilterMode.EXCLUDE -> R.drawable.ic_off_small
+	else -> defaultIcon
+}
+
+private fun SourceCatalogFilterMode.sourceKindTint(): Int = when (this) {
+	SourceCatalogFilterMode.EXCLUDE -> R.color.error
+	else -> 0
 }

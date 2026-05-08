@@ -9,8 +9,10 @@ import okhttp3.Request
 import org.koitharu.kotatsu.core.cache.MemoryContentCache
 import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.MangaSourceInfo
+import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.model.TestMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
+import org.koitharu.kotatsu.core.prefs.SourceSettings
 import org.koitharu.kotatsu.core.network.CommonHeaders
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaRepository
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
@@ -106,6 +108,12 @@ interface MangaRepository {
 				parser = loaderContext.newParserInstance(source),
 				cache = contentCache,
 				mirrorSwitcher = mirrorSwitcher,
+			)
+
+			is PluginMangaSource -> PluginMangaRepository(
+				loadedParser = DynamicParserManager.createParser(source, loaderContext, context),
+				settings = SourceSettings(context, source),
+				cache = contentCache,
 			)
 
 			TestMangaSource -> TestMangaRepository(

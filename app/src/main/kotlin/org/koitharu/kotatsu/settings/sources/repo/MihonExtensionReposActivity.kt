@@ -134,10 +134,16 @@ class MihonExtensionReposActivity : BaseActivity<ActivitySourcesCatalogBinding>(
 			input?.setText(initialValue)
 			input?.let { UrlValidator().attachToEditText(it) }
 			setNegativeButton(android.R.string.cancel, null)
+			setNeutralButton(R.string.use_suggested_repo, null)
 			setPositiveButton(android.R.string.ok, null)
 		}
 		dialog = alertDialog
 		alertDialog.setOnShowListener {
+			dialog?.getButton(DialogInterface.BUTTON_NEUTRAL)?.setOnClickListener {
+				input?.setText(MihonExtensionReposViewModel.SUGGESTED_REPO_URL)
+				input?.setSelection(input?.text?.length ?: 0)
+				input?.error = null
+			}
 			dialog?.getButton(DialogInterface.BUTTON_POSITIVE)?.setOnClickListener {
 				val editText = input ?: return@setOnClickListener
 				val value = editText.text?.toString().orEmpty().trim()

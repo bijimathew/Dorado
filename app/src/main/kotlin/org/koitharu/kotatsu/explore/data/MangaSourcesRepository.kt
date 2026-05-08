@@ -27,6 +27,8 @@ import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.db.dao.MangaSourcesDao
 import org.koitharu.kotatsu.core.db.entity.MangaSourceEntity
 import org.koitharu.kotatsu.core.model.MangaSourceInfo
+import org.koitharu.kotatsu.core.model.MangaSourceRegistry
+import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.model.getTitle
 import org.koitharu.kotatsu.core.model.isNsfw
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
@@ -67,9 +69,11 @@ class MangaSourcesRepository @Inject constructor(
 		val isBroken: Boolean,
 		val isNsfw: Boolean,
 		val isMihon: Boolean,
+		val isPlugin: Boolean,
 	)
 
 	private val isNewSourcesAssimilated = AtomicBoolean(false)
+	private var assimilatedPluginVersion = -1
 	private val dao: MangaSourcesDao
 		get() = db.getSourcesDao()
 
@@ -81,6 +85,7 @@ class MangaSourcesRepository @Inject constructor(
 
 	suspend fun getEnabledSources(): List<MangaSource> {
 		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
 		assimilateAvailableSources(mihonSources)
 		val order = settings.sourcesSortOrder
 		val enabled = dao.findAll(!settings.isAllSourcesEnabled, order).toSources(
@@ -88,6 +93,7 @@ class MangaSourcesRepository @Inject constructor(
 			sortOrder = order,
 			hideBrokenSources = settings.isBrokenSourcesHidden,
 			mihonSources = mihonSources.associateBy { it.name },
+			pluginSources = pluginSources.associateBy { it.name },
 		)
 		val external = getExternalSources()
 		return ArrayList<MangaSourceInfo>(enabled.size + external.size).also { list ->
@@ -98,15 +104,17 @@ class MangaSourcesRepository @Inject constructor(
 
 	suspend fun getPinnedSources(): Set<MangaSource> {
 		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
 		assimilateAvailableSources(mihonSources)
 		val skipNsfw = settings.isNsfwContentDisabled
 		val hideBroken = settings.isBrokenSourcesHidden
 		val mihonByName = mihonSources.associateBy { it.name }
+		val pluginByName = pluginSources.associateBy { it.name }
 		return buildSet {
 			addAll(getExternalSources())
 			addAll(dao.findAllPinned().mapNotNullToSet {
-				it.source.toInstalledSourceOrNull(mihonByName)?.takeUnless { x ->
-					(skipNsfw && x.isNsfw()) || (hideBroken && x is MangaParserSource && x.isBroken)
+				it.source.toInstalledSourceOrNull(mihonByName, pluginByName)?.takeUnless { x ->
+					(skipNsfw && x.isNsfw()) || (hideBroken && x.isBrokenSource())
 				}
 			})
 		}
@@ -114,12 +122,14 @@ class MangaSourcesRepository @Inject constructor(
 
 	suspend fun getTopSources(limit: Int): List<MangaSource> {
 		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
 		assimilateAvailableSources(mihonSources)
 		return dao.findLastUsed(limit).toSources(
 			skipNsfwSources = settings.isNsfwContentDisabled,
 			sortOrder = null,
 			hideBrokenSources = settings.isBrokenSourcesHidden,
 			mihonSources = mihonSources.associateBy { it.name },
+			pluginSources = pluginSources.associateBy { it.name },
 		)
 	}
 
@@ -131,11 +141,15 @@ class MangaSourcesRepository @Inject constructor(
 		}
 		val skipNsfw = settings.isNsfwContentDisabled
 		val hideBroken = settings.isBrokenSourcesHidden
-		val result = LinkedHashSet<MangaSource>(allMangaSources.size + mihonSources.size)
+		val pluginSources = getPluginSources()
+		val result = LinkedHashSet<MangaSource>(allMangaSources.size + mihonSources.size + pluginSources.size)
 		allMangaSources.filterNotTo(result) { source ->
 			(skipNsfw && source.isNsfw()) || (hideBroken && source.isBroken)
 		}
 		mihonSources.filterNotTo(result) { skipNsfw && it.isNsfw() }
+		pluginSources.filterNotTo(result) { source ->
+			(skipNsfw && source.isNsfw()) || (hideBroken && source.isBroken)
+		}
 		val enabled = dao.findAllEnabledNames()
 		result.removeAll { it.name in enabled }
 		return result
@@ -148,7 +162,10 @@ class MangaSourcesRepository @Inject constructor(
 		types: Set<ContentType>,
 		query: String?,
 		locale: String?,
-		isMihonOnly: Boolean,
+		includeMihon: Boolean,
+		excludeMihon: Boolean,
+		includePlugins: Boolean,
+		excludePlugins: Boolean,
 		sortOrder: SourcesSortOrder?,
 		snapshot: List<ParserSourceSnapshot>? = null,
 	): List<MangaSource> {
@@ -163,6 +180,7 @@ class MangaSourcesRepository @Inject constructor(
 			emptySet()
 		}
 		val effectiveQuery = query?.takeIf { it.isNotBlank() }
+		val hasSourceKindIncludes = includeMihon || includePlugins
 		val sources = ArrayList<MangaSource>(entries.size)
 		for ((index, entry) in entries.withIndex()) {
 			if (index % 32 == 0) {
@@ -183,7 +201,13 @@ class MangaSourcesRepository @Inject constructor(
 			if (locale != null && entry.locale != locale) {
 				continue
 			}
-			if (isMihonOnly && !entry.isMihon) {
+			if (excludeMihon && entry.isMihon) {
+				continue
+			}
+			if (excludePlugins && entry.isPlugin) {
+				continue
+			}
+			if (hasSourceKindIncludes && !((includeMihon && entry.isMihon) || (includePlugins && entry.isPlugin))) {
 				continue
 			}
 			if (excludeBroken && !hideBrokenSources && entry.isBroken) {
@@ -209,15 +233,18 @@ class MangaSourcesRepository @Inject constructor(
 
 	suspend fun getParserSourcesSnapshot(): List<ParserSourceSnapshot> {
 		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
 		assimilateAvailableSources(mihonSources)
 		val mihonByName = mihonSources.associateBy { it.name }
+		val pluginByName = pluginSources.associateBy { it.name }
 		return dao.findAll().mapNotNull { entity ->
-			val source = entity.source.toInstalledSourceOrNull(mihonByName) ?: return@mapNotNull null
+			val source = entity.source.toInstalledSourceOrNull(mihonByName, pluginByName) ?: return@mapNotNull null
 			if (source is MangaParserSource && source !in allMangaSources) {
 				return@mapNotNull null
 			}
 			val locale = when (source) {
 				is MangaParserSource -> source.locale
+				is PluginMangaSource -> source.locale
 				is MihonMangaSource -> source.resolved().locale
 				else -> null
 			}
@@ -227,14 +254,16 @@ class MangaSourcesRepository @Inject constructor(
 				locale = locale,
 				contentType = when (source) {
 					is MangaParserSource -> source.contentType
+					is PluginMangaSource -> source.contentType
 					is MihonMangaSource -> ContentType.MANGA
 					else -> ContentType.OTHER
 				},
 				isEnabled = entity.isEnabled,
 				addedIn = entity.addedIn,
-				isBroken = source is MangaParserSource && source.isBroken,
+				isBroken = source.isBrokenSource(),
 				isNsfw = source.isNsfw(),
 				isMihon = source is MihonMangaSource,
+				isPlugin = source is PluginMangaSource,
 			)
 		}.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
 	}
@@ -249,14 +278,16 @@ class MangaSourcesRepository @Inject constructor(
 			observeHideBrokenSources(),
 			observeAllEnabled(),
 			observeMihonSources(),
-		) { skipNsfw, hideBroken, isAllSourcesEnabled, mihonSources ->
+			registryUpdates,
+		) { skipNsfw, hideBroken, isAllSourcesEnabled, mihonSources, _ ->
 			assimilateAvailableSources(mihonSources)
 			val mihonByName = mihonSources.associateBy { it.name }
+			val pluginByName = getPluginSources().associateBy { it.name }
 			dao.observeAll(!isAllSourcesEnabled, SourcesSortOrder.MANUAL).map { sources ->
 				sources.count {
-					it.source.toInstalledSourceOrNull(mihonByName)?.let { source ->
+					it.source.toInstalledSourceOrNull(mihonByName, pluginByName)?.let { source ->
 						(!skipNsfw || !source.isNsfw()) &&
-							(!hideBroken || source !is MangaParserSource || !source.isBroken)
+							(!hideBroken || !source.isBrokenSource())
 					} == true
 				}
 			}
@@ -269,12 +300,16 @@ class MangaSourcesRepository @Inject constructor(
 			observeHideBrokenSources(),
 			observeAllEnabled(),
 			observeMihonSources(),
-		) { skipNsfw, hideBroken, isAllSourcesEnabled, mihonSources ->
+			registryUpdates,
+		) { skipNsfw, hideBroken, isAllSourcesEnabled, mihonSources, _ ->
 			if (isAllSourcesEnabled) {
 				return@combine flowOf(0)
 			}
 			assimilateAvailableSources(mihonSources)
-			val available = LinkedHashMap<String, MangaSource>(allMangaSources.size + mihonSources.size)
+			val pluginSources = getPluginSources()
+			val available = LinkedHashMap<String, MangaSource>(
+				allMangaSources.size + mihonSources.size + pluginSources.size,
+			)
 			allMangaSources.forEach { source ->
 				if ((!skipNsfw || !source.isNsfw()) && (!hideBroken || !source.isBroken)) {
 					available[source.name] = source
@@ -285,6 +320,11 @@ class MangaSourcesRepository @Inject constructor(
 					available[source.name] = source
 				}
 			}
+			pluginSources.forEach { source ->
+				if ((!skipNsfw || !source.isNsfw()) && (!hideBroken || !source.isBroken)) {
+					available[source.name] = source
+				}
+			}
 			dao.observeAll(enabledOnly = true, order = SourcesSortOrder.MANUAL).map { enabledSources ->
 				val enabled = enabledSources.mapTo(HashSet(enabledSources.size)) { it.source }
 				available.count { (name, _) -> name !in enabled }
@@ -292,23 +332,27 @@ class MangaSourcesRepository @Inject constructor(
 		}.flattenLatest().distinctUntilChanged().onStart { assimilateAvailableSources() }
 	}
 
-	fun observeEnabledSources(): Flow<List<MangaSourceInfo>> = combine(
-		observeIsNsfwDisabled(),
-		observeHideBrokenSources(),
-		observeAllEnabled(),
-		observeSortOrder(),
-		observeMihonSources(),
-	) { skipNsfw, hideBroken, allEnabled, order, mihonSources ->
-		assimilateAvailableSources(mihonSources)
-		dao.observeAll(!allEnabled, order).map {
-			it.toSources(
-				skipNsfwSources = skipNsfw,
-				sortOrder = order,
-				hideBrokenSources = hideBroken,
-				mihonSources = mihonSources.associateBy { source -> source.name },
-			)
-		}
-	}.flattenLatest()
+	fun observeEnabledSources(): Flow<List<MangaSourceInfo>> = registryUpdates.flatMapLatest {
+		combine(
+			observeIsNsfwDisabled(),
+			observeHideBrokenSources(),
+			observeAllEnabled(),
+			observeSortOrder(),
+			observeMihonSources(),
+		) { skipNsfw, hideBroken, allEnabled, order, mihonSources ->
+			assimilateAvailableSources(mihonSources)
+			val pluginByName = getPluginSources().associateBy { source -> source.name }
+			dao.observeAll(!allEnabled, order).map {
+				it.toSources(
+					skipNsfwSources = skipNsfw,
+					sortOrder = order,
+					hideBrokenSources = hideBroken,
+					mihonSources = mihonSources.associateBy { source -> source.name },
+					pluginSources = pluginByName,
+				)
+			}
+		}.flattenLatest()
+	}
 		.onStart { assimilateAvailableSources() }
 		.combine(observeExternalSources()) { enabled, external ->
 			val list = ArrayList<MangaSourceInfo>(enabled.size + external.size)
@@ -317,15 +361,18 @@ class MangaSourcesRepository @Inject constructor(
 			list
 		}
 
-	fun observeAll(): Flow<List<Pair<MangaSource, Boolean>>> = dao.observeAll().map { entities ->
-		val result = ArrayList<Pair<MangaSource, Boolean>>(entities.size)
-		for (entity in entities) {
-			val source = entity.source.toParserSourceOrNull() ?: continue
-			if (source in allMangaSources) {
-				result.add(source to entity.isEnabled)
+	fun observeAll(): Flow<List<Pair<MangaSource, Boolean>>> = registryUpdates.flatMapLatest {
+		dao.observeAll().map { entities ->
+			val pluginByName = getPluginSources().associateBy { source -> source.name }
+			val result = ArrayList<Pair<MangaSource, Boolean>>(entities.size)
+			for (entity in entities) {
+				val source = entity.source.toParserOrPluginSourceOrNull(pluginByName) ?: continue
+				if (source is PluginMangaSource || source in allMangaSources) {
+					result.add(source to entity.isEnabled)
+				}
 			}
+			result
 		}
-		result
 	}.onStart { assimilateNewParserSources() }
 
 	suspend fun setSourcesEnabled(sources: Collection<MangaSource>, isEnabled: Boolean): ReversibleHandle {
@@ -337,12 +384,16 @@ class MangaSourcesRepository @Inject constructor(
 
 	suspend fun setSourcesEnabledExclusive(sources: Set<MangaSource>) {
 		val mihonSources = getMihonSources()
+		val pluginSources = getPluginSources()
 		db.withTransaction {
 			assimilateAvailableSources(mihonSources)
 			for (s in allMangaSources) {
 				dao.setEnabled(s.name, s in sources)
 			}
 			for (s in mihonSources) {
+				dao.setEnabled(s.name, s in sources)
+			}
+			for (s in pluginSources) {
 				dao.setEnabled(s.name, s in sources)
 			}
 		}
@@ -369,6 +420,7 @@ class MangaSourcesRepository @Inject constructor(
 			sortOrder = null,
 			hideBrokenSources = settings.isBrokenSourcesHidden,
 			mihonSources = emptyMap(),
+			pluginSources = getPluginSources().associateBy { it.name },
 		)
 		sources.isNotEmpty() && sources.size != allMangaSources.size
 	}.onStart { assimilateNewParserSources() }
@@ -384,6 +436,7 @@ class MangaSourcesRepository @Inject constructor(
 				sortOrder = null,
 				hideBrokenSources = hideBroken,
 				mihonSources = emptyMap(),
+				pluginSources = getPluginSources().associateBy { it.name },
 			)
 			sources.isNotEmpty()
 		} else {
@@ -402,6 +455,12 @@ class MangaSourcesRepository @Inject constructor(
 		return assimilateInstalledMihonSources(getMihonSources())
 	}
 
+	fun observeInstalledPluginSources(): Flow<List<PluginMangaSource>> =
+		registryUpdates.map { getPluginSources() }
+
+	suspend fun refreshInstalledPluginSources(): Boolean =
+		assimilateInstalledPluginSources(getPluginSources())
+
 	private suspend fun assimilateAvailableSources(): Boolean {
 		return assimilateAvailableSources(getMihonSources())
 	}
@@ -409,7 +468,8 @@ class MangaSourcesRepository @Inject constructor(
 	private suspend fun assimilateAvailableSources(mihonSources: List<MihonMangaSource>): Boolean {
 		val parsersUpdated = assimilateNewParserSources()
 		val mihonUpdated = assimilateInstalledMihonSources(mihonSources)
-		return parsersUpdated || mihonUpdated
+		val pluginUpdated = assimilateInstalledPluginSources(getPluginSources())
+		return parsersUpdated || mihonUpdated || pluginUpdated
 	}
 
 	private suspend fun assimilateNewParserSources(): Boolean {
@@ -443,6 +503,37 @@ class MangaSourcesRepository @Inject constructor(
 		}
 		val known = dao.findAll().mapTo(HashSet()) { it.source }
 		val missing = mihonSources.filterNot { it.name in known }
+		if (missing.isEmpty()) {
+			return false
+		}
+		var maxSortKey = dao.getMaxSortKey()
+		val isAllEnabled = settings.isAllSourcesEnabled
+		val entities = missing.map { source ->
+			MangaSourceEntity(
+				source = source.name,
+				isEnabled = isAllEnabled,
+				sortKey = ++maxSortKey,
+				addedIn = BuildConfig.VERSION_CODE,
+				lastUsedAt = 0,
+				isPinned = false,
+				cfState = CloudFlareHelper.PROTECTION_NOT_DETECTED,
+			)
+		}
+		dao.insertIfAbsent(entities)
+		return true
+	}
+
+	private suspend fun assimilateInstalledPluginSources(pluginSources: List<PluginMangaSource>): Boolean {
+		val currentVersion = MangaSourceRegistry.version
+		if (assimilatedPluginVersion == currentVersion) {
+			return false
+		}
+		assimilatedPluginVersion = currentVersion
+		if (pluginSources.isEmpty()) {
+			return false
+		}
+		val known = dao.findAll().mapTo(HashSet()) { it.source }
+		val missing = pluginSources.filterNot { it.name in known }
 		if (missing.isEmpty()) {
 			return false
 		}
@@ -577,6 +668,9 @@ class MangaSourcesRepository @Inject constructor(
 			.conflate()
 	}
 
+	private val registryUpdates: Flow<Unit>
+		get() = MangaSourceRegistry.updates.onStart { emit(Unit) }
+
 	fun getExternalSources(): List<ExternalMangaSource> = context.packageManager.queryIntentContentProviders(
 		Intent("app.kotatsu.parser.PROVIDE_MANGA"), 0,
 	).map { resolveInfo ->
@@ -590,9 +684,13 @@ class MangaSourcesRepository @Inject constructor(
 		mihonExtensionManager.getInstalledSources()
 	}
 
+	private fun getPluginSources(): List<PluginMangaSource> =
+		MangaSourceRegistry.entries.filterIsInstance<PluginMangaSource>()
+
 	private suspend fun ensureSourceTracked(source: MangaSource) {
 		when (source) {
 			is MangaParserSource -> assimilateNewParserSources()
+			is PluginMangaSource -> assimilateInstalledPluginSources(listOf(source))
 			is MihonMangaSource -> {
 				val installed = mihonExtensionManager.resolve(source)?.wrapper ?: return
 				assimilateInstalledMihonSources(listOf(installed))
@@ -605,15 +703,16 @@ class MangaSourcesRepository @Inject constructor(
 		sortOrder: SourcesSortOrder?,
 		hideBrokenSources: Boolean,
 		mihonSources: Map<String, MihonMangaSource>,
+		pluginSources: Map<String, PluginMangaSource>,
 	): MutableList<MangaSourceInfo> {
 		val isAllEnabled = settings.isAllSourcesEnabled
 		val result = ArrayList<MangaSourceInfo>(size)
 		for (entity in this) {
-			val source = entity.source.toInstalledSourceOrNull(mihonSources) ?: continue
+			val source = entity.source.toInstalledSourceOrNull(mihonSources, pluginSources) ?: continue
 			if (skipNsfwSources && source.isNsfw()) {
 				continue
 			}
-			if (hideBrokenSources && source is MangaParserSource && source.isBroken) {
+			if (hideBrokenSources && source.isBrokenSource()) {
 				continue
 			}
 			result.add(
@@ -648,7 +747,20 @@ class MangaSourcesRepository @Inject constructor(
 
 	private fun String.toParserSourceOrNull(): MangaParserSource? = MangaParserSource.entries.find { it.name == this }
 
-	private fun String.toInstalledSourceOrNull(mihonSources: Map<String, MihonMangaSource>): MangaSource? {
-		return toParserSourceOrNull() ?: mihonSources[this]
+	private fun String.toParserOrPluginSourceOrNull(
+		pluginSources: Map<String, PluginMangaSource>,
+	): MangaSource? = toParserSourceOrNull() ?: pluginSources[this]
+
+	private fun String.toInstalledSourceOrNull(
+		mihonSources: Map<String, MihonMangaSource>,
+		pluginSources: Map<String, PluginMangaSource>,
+	): MangaSource? {
+		return toParserSourceOrNull() ?: pluginSources[this] ?: mihonSources[this]
+	}
+
+	private fun MangaSource.isBrokenSource(): Boolean = when (this) {
+		is MangaParserSource -> isBroken
+		is PluginMangaSource -> isBroken
+		else -> false
 	}
 }

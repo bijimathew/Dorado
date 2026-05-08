@@ -10,6 +10,7 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.parser.EmptyMangaRepository
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
+import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.util.mapToArray
@@ -21,13 +22,21 @@ import org.koitharu.kotatsu.settings.utils.validation.HeaderValidator
 
 fun PreferenceFragmentCompat.addPreferencesFromRepository(repository: MangaRepository) = when (repository) {
 	is ParserMangaRepository -> addPreferencesFromParserRepository(repository)
+	is PluginMangaRepository -> addPreferencesFromPluginRepository(repository)
 	is EmptyMangaRepository -> addPreferencesFromEmptyRepository()
 	else -> Unit
 }
 
 private fun PreferenceFragmentCompat.addPreferencesFromParserRepository(repository: ParserMangaRepository) {
+	addPreferencesFromConfigKeys(repository.getConfigKeys())
+}
+
+private fun PreferenceFragmentCompat.addPreferencesFromPluginRepository(repository: PluginMangaRepository) {
+	addPreferencesFromConfigKeys(repository.getConfigKeys())
+}
+
+private fun PreferenceFragmentCompat.addPreferencesFromConfigKeys(configKeys: List<ConfigKey<*>>) {
 	addPreferencesFromResource(R.xml.pref_source_parser)
-	val configKeys = repository.getConfigKeys()
 	val screen = preferenceScreen
 	for (key in configKeys) {
 		val preference: Preference = when (key) {

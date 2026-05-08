@@ -15,6 +15,7 @@ import okhttp3.ResponseBody.Companion.asResponseBody
 import okio.Buffer
 import org.koitharu.kotatsu.core.exceptions.InteractiveActionRequiredException
 import org.koitharu.kotatsu.core.image.BitmapDecoderCompat
+import org.koitharu.kotatsu.core.model.MangaSourceRegistry
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.network.cookies.MutableCookieJar
 import org.koitharu.kotatsu.core.network.webview.WebViewExecutor
@@ -26,6 +27,7 @@ import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaParser
 import org.koitharu.kotatsu.parsers.bitmap.Bitmap
 import org.koitharu.kotatsu.parsers.config.MangaSourceConfig
+import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.core.network.webview.WebViewRequestInterceptorExecutor
 import org.koitharu.kotatsu.parsers.webview.InterceptedRequest
@@ -57,7 +59,20 @@ class MangaLoaderContextImpl @Inject constructor(
     override suspend fun evaluateJs(baseUrl: String, script: String, timeout: Long): String? =
         webViewExecutor.evaluateJs(baseUrl, script, timeoutMs = timeout)
 
+    override suspend fun evaluateJs(baseUrl: String, script: String): String? =
+        evaluateJs(baseUrl, script, timeout = 10000L)
+
     override fun getDefaultUserAgent(): String = webViewUserAgent
+
+    override fun getParserSources(): List<MangaSource> = MangaParserSource.entries + MangaSourceRegistry.entries
+
+    override fun newParserInstance(source: MangaSource): MangaParser {
+        return if (source is MangaParserSource) {
+            super.newParserInstance(source)
+        } else {
+            DynamicParserManager.createParserProxy(source, this, androidContext)
+        }
+    }
 
     override fun getConfig(source: MangaSource): MangaSourceConfig {
         return SourceSettings(androidContext, source)

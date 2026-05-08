@@ -9,9 +9,11 @@ import okhttp3.Response
 import okio.IOException
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.core.model.MangaSource
+import org.koitharu.kotatsu.core.model.PluginMangaSource
 import org.koitharu.kotatsu.core.parser.MangaLoaderContextImpl
 import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.parser.ParserMangaRepository
+import org.koitharu.kotatsu.core.parser.PluginMangaRepository
 import org.koitharu.kotatsu.core.parser.mihon.MihonMangaSource
 import org.koitharu.kotatsu.core.parser.mihon.MihonSourceRegistry
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
@@ -33,18 +35,24 @@ class CommonHeadersInterceptor @Inject constructor(
 		val request = chain.request()
 		val source = request.tag(MangaSource::class.java)
 			?: request.headers[CommonHeaders.MANGA_SOURCE]?.let { MangaSource(it) }
-		val repository = if (source is MangaParserSource) {
-			mangaRepositoryFactoryLazy.get().create(source) as? ParserMangaRepository
-		} else {
-			if (BuildConfig.DEBUG && source == null) {
-				IllegalArgumentException("Request without source tag: ${request.url}")
-					.printStackTrace()
+		val repository = when (source) {
+			is MangaParserSource,
+			is PluginMangaSource -> mangaRepositoryFactoryLazy.get().create(source)
+			else -> {
+				if (BuildConfig.DEBUG && source == null) {
+					IllegalArgumentException("Request without source tag: ${request.url}")
+						.printStackTrace()
+				}
+				null
 			}
-			null
 		}
 		val headersBuilder = request.headers.newBuilder()
 			.removeAll(CommonHeaders.MANGA_SOURCE)
-		repository?.getRequestHeaders()?.let {
+		when (repository) {
+			is ParserMangaRepository -> repository.getRequestHeaders()
+			is PluginMangaRepository -> repository.getRequestHeaders()
+			else -> null
+		}?.let {
 			headersBuilder.mergeWith(it, replaceExisting = false)
 		}
 		if (source is MihonMangaSource) {
@@ -55,8 +63,13 @@ class CommonHeadersInterceptor @Inject constructor(
 		if (headersBuilder[CommonHeaders.USER_AGENT] == null) {
 			headersBuilder[CommonHeaders.USER_AGENT] = mangaLoaderContextLazy.get().getDefaultUserAgent()
 		}
-		if (headersBuilder[CommonHeaders.REFERER] == null && repository != null) {
-			val idn = IDN.toASCII(repository.domain)
+		val parserDomain = when (repository) {
+			is ParserMangaRepository -> repository.domain
+			is PluginMangaRepository -> repository.domain
+			else -> null
+		}
+		if (headersBuilder[CommonHeaders.REFERER] == null && !parserDomain.isNullOrBlank()) {
+			val idn = IDN.toASCII(parserDomain)
 			headersBuilder.trySet(CommonHeaders.REFERER, "https://$idn/")
 		} else if (headersBuilder[CommonHeaders.REFERER] == null && source is MihonMangaSource) {
 			MihonSourceRegistry.getDefaultReferer(source)?.let {
@@ -64,7 +77,7 @@ class CommonHeadersInterceptor @Inject constructor(
 			}
 		}
 		val newRequest = request.newBuilder().headers(headersBuilder.build()).build()
-		return repository?.interceptSafe(ProxyChain(chain, newRequest)) ?: chain.proceed(newRequest)
+		return (repository as? Interceptor)?.interceptSafe(ProxyChain(chain, newRequest)) ?: chain.proceed(newRequest)
 	}
 
 	private fun Headers.Builder.trySet(name: String, value: String) = try {

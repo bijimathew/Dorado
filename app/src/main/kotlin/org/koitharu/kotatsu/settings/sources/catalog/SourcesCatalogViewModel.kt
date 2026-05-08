@@ -53,7 +53,8 @@ class SourcesCatalogViewModel @Inject constructor(
 			types = emptySet(),
 			locale = null,
 			isNewOnly = false,
-			isMihonOnly = false,
+			mihonMode = SourceCatalogFilterMode.NONE,
+			pluginMode = SourceCatalogFilterMode.NONE,
 		),
 	)
 
@@ -82,8 +83,9 @@ class SourcesCatalogViewModel @Inject constructor(
 					emitInitialState = true,
 				),
 				repository.observeInstalledMihonSources().onStart { emit(emptyList()) },
+				repository.observeInstalledPluginSources().onStart { emit(emptyList()) },
 				refreshTrigger,
-			) { _, _, _ -> Unit }.mapLatest {
+			) { _, _, _, _ -> Unit }.mapLatest {
 				runCatching {
 					repository.getParserSourcesSnapshot()
 				}.onFailure { error ->
@@ -156,13 +158,20 @@ class SourcesCatalogViewModel @Inject constructor(
 		appliedFilter.value = appliedFilter.value.copy(isNewOnly = value)
 	}
 
-	fun setMihonOnly(value: Boolean) {
-		appliedFilter.value = appliedFilter.value.copy(isMihonOnly = value)
+	fun cycleMihonMode() {
+		val filter = appliedFilter.value
+		appliedFilter.value = filter.copy(mihonMode = filter.mihonMode.next())
+	}
+
+	fun cyclePluginMode() {
+		val filter = appliedFilter.value
+		appliedFilter.value = filter.copy(pluginMode = filter.pluginMode.next())
 	}
 
 	fun refreshSources() {
 		launchJob(Dispatchers.IO) {
 			repository.refreshInstalledMihonSources()
+			repository.refreshInstalledPluginSources()
 			refreshTrigger.value += 1
 		}
 	}
@@ -179,7 +188,10 @@ class SourcesCatalogViewModel @Inject constructor(
 			types = filter.types,
 			query = query,
 			locale = filter.locale,
-			isMihonOnly = filter.isMihonOnly,
+			includeMihon = filter.mihonMode == SourceCatalogFilterMode.INCLUDE,
+			excludeMihon = filter.mihonMode == SourceCatalogFilterMode.EXCLUDE,
+			includePlugins = filter.pluginMode == SourceCatalogFilterMode.INCLUDE,
+			excludePlugins = filter.pluginMode == SourceCatalogFilterMode.EXCLUDE,
 			sortOrder = SourcesSortOrder.ALPHABETIC,
 			snapshot = snapshot,
 		)
@@ -227,4 +239,10 @@ class SourcesCatalogViewModel @Inject constructor(
 	private companion object {
 		private const val SEARCH_DEBOUNCE_TIMEOUT = 180L
 	}
+}
+
+private fun SourceCatalogFilterMode.next(): SourceCatalogFilterMode = when (this) {
+	SourceCatalogFilterMode.NONE -> SourceCatalogFilterMode.INCLUDE
+	SourceCatalogFilterMode.INCLUDE -> SourceCatalogFilterMode.EXCLUDE
+	SourceCatalogFilterMode.EXCLUDE -> SourceCatalogFilterMode.NONE
 }

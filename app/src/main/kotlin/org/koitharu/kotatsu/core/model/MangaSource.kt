@@ -50,10 +50,18 @@ fun MangaSource(name: String?): MangaSource {
 			sourceId = parts.second.toLongOrNull() ?: return UnknownMangaSource,
 		)
 	}
+	if (':' in name) {
+		MangaSourceRegistry.resolve(name)?.let {
+			return it
+		}
+	}
 	MangaParserSource.entries.forEach {
 		if (it.name == name) return it
 	}
-	return UnknownMangaSource
+	MangaSourceRegistry.resolve(name)?.let {
+		return it
+	}
+	return UnresolvedMangaSource(name)
 }
 
 fun Collection<String>.toMangaSources() = map(::MangaSource)
@@ -61,6 +69,7 @@ fun Collection<String>.toMangaSources() = map(::MangaSource)
 fun MangaSource.isNsfw(): Boolean = when (this) {
 	is MangaSourceInfo -> mangaSource.isNsfw()
 	is MangaParserSource -> contentType == ContentType.HENTAI
+	is PluginMangaSource -> contentType == ContentType.HENTAI
 	is MihonMangaSource -> resolved().isNsfwSource
 	else -> false
 }
@@ -90,6 +99,7 @@ tailrec fun MangaSource.unwrap(): MangaSource = if (this is MangaSourceInfo) {
 
 fun MangaSource.getLocale(): Locale? = when (val source = unwrap()) {
 	is MangaParserSource -> source.locale.toLocaleOrNull()
+	is PluginMangaSource -> source.locale.toLocaleOrNull()
 	is MihonMangaSource -> source.resolved().locale?.toLocaleOrNull()
 	else -> null
 }
@@ -104,6 +114,17 @@ fun MangaSource.getSummary(context: Context): String? = when (val source = unwra
 		val type = context.getString(source.contentType.titleResId)
 		val locale = source.locale.toLocale().getDisplayName(context)
 		context.getString(R.string.source_summary_pattern, type, locale)
+	}
+
+	is PluginMangaSource -> {
+		val type = context.getString(source.contentType.titleResId)
+		val locale = source.locale.toLocaleOrNull()?.getDisplayName(context)
+		val baseSummary = if (locale != null) {
+			context.getString(R.string.source_summary_pattern, type, locale)
+		} else {
+			type
+		}
+		"$baseSummary • ${source.jarName}"
 	}
 
 	is MihonMangaSource -> source.resolved().locale?.toLocaleOrNull()?.let { locale ->
@@ -121,10 +142,12 @@ fun MangaSource.getSummary(context: Context): String? = when (val source = unwra
 
 fun MangaSource.getTitle(context: Context): String = when (val source = unwrap()) {
 	is MangaParserSource -> source.title
+	is PluginMangaSource -> source.title
 	is MihonMangaSource -> source.resolveName(context)
 	LocalMangaSource -> context.getString(R.string.local_storage)
 	TestMangaSource -> context.getString(R.string.test_parser)
 	is ExternalMangaSource -> source.resolveName(context)
+	is UnresolvedMangaSource -> source.name
 	else -> context.getString(R.string.unknown)
 }
 
