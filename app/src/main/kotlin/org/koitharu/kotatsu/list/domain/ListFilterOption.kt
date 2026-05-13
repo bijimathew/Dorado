@@ -6,9 +6,11 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.db.entity.toEntity
 import org.koitharu.kotatsu.core.model.FavouriteCategory
 import org.koitharu.kotatsu.core.model.LocalMangaSource
+import org.koitharu.kotatsu.core.model.titleResId
 import org.koitharu.kotatsu.core.model.unwrap
 import org.koitharu.kotatsu.core.parser.external.ExternalMangaSource
 import org.koitharu.kotatsu.core.parser.favicon.faviconUri
+import org.koitharu.kotatsu.parsers.model.ContentType as MangaContentType
 import org.koitharu.kotatsu.parsers.model.MangaParserSource
 import org.koitharu.kotatsu.parsers.model.MangaSource
 import org.koitharu.kotatsu.parsers.model.MangaTag
@@ -94,6 +96,37 @@ sealed interface ListFilterOption {
 
 		override val groupKey: String
 			get() = "_tag"
+	}
+
+	data class TagTitle(
+		override val titleText: String,
+	) : ListFilterOption {
+
+		override val titleResId: Int
+			get() = 0
+
+		override val iconResId: Int
+			get() = R.drawable.ic_tag
+
+		override val groupKey: String
+			get() = "_tagtitle"
+	}
+
+	data class ContentType(
+		val contentType: MangaContentType,
+	) : ListFilterOption {
+
+		override val titleResId: Int
+			get() = contentType.titleResId
+
+		override val iconResId: Int
+			get() = R.drawable.ic_manga_source
+
+		override val titleText: CharSequence?
+			get() = null
+
+		override val groupKey: String
+			get() = "_ctype"
 	}
 
 	data class Favorite(
