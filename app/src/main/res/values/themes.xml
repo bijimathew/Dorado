@@ -79,6 +79,16 @@
 	<!--== Default Theme ==-->
 	<style name="Theme.Kotatsu" parent="Base.Theme.Kotatsu" />
 
+	<!-- Translucent theme for the silent CloudFlare auto-resolve activity. Read by WindowManager
+	     before onCreate, so it must be applied via the manifest, not setTheme(). -->
+	<style name="Theme.Kotatsu.CloudFlareHidden" parent="Theme.Kotatsu">
+		<item name="android:windowIsTranslucent">true</item>
+		<item name="android:windowBackground">@android:color/transparent</item>
+		<item name="android:windowNoTitle">true</item>
+		<item name="android:windowAnimationStyle">@null</item>
+		<item name="android:backgroundDimEnabled">false</item>
+	</style>
+
 	<!-- Base ThemeOverlay -->
 	<style name="ThemeOverlay.Kotatsu" parent="ThemeOverlay.Material3.Light" />
 

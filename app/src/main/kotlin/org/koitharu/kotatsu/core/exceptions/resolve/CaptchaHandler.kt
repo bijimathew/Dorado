@@ -87,15 +87,16 @@ class CaptchaHandler @Inject constructor(
 		if (e is CloudFlareException) {
 			val scope = request.lifecycle?.coroutineScope ?: processLifecycleScope
 			scope.launch {
-				if (
-					handleException(
-						source = e.source,
-						exception = e,
-						notify = request.extras[suppressCaptchaKey] != true,
-					)
-				) {
-					coilProvider.get().enqueue(request) // TODO check if ok
-				}
+				// Don't run the silent auto-resolve from coil's error path: failed favicon / cover
+				// loads would each queue up an attempt and (now that the WebView is window-attached)
+				// flash a hidden overlay. Auto-resolve only happens for explicit interactions
+				// (opening a source, opening a manga, reading) via ExceptionResolver / coordinator.
+				handleException(
+					source = e.source,
+					exception = e,
+					notify = request.extras[suppressCaptchaKey] != true,
+					tryAutoResolve = false,
+				)
 			}
 		}
 	}
@@ -104,11 +105,16 @@ class CaptchaHandler @Inject constructor(
 		source: MangaSource,
 		exception: CloudFlareException?,
 		notify: Boolean,
+		tryAutoResolve: Boolean = true,
 	): Boolean = withContext(Dispatchers.Default) {
 		if (source == UnknownMangaSource) {
 			return@withContext false
 		}
-		if (exception != null && webViewExecutor.tryResolveCaptcha(exception, RESOLVE_TIMEOUT)) {
+		if (
+			tryAutoResolve &&
+			exception != null &&
+			webViewExecutor.tryResolveCaptcha(exception, RESOLVE_TIMEOUT)
+		) {
 			return@withContext true
 		}
 		mutex.withLock {

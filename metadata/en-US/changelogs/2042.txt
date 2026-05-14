@@ -1,0 +1,8 @@
+- CloudFlare challenges resolve silently in a hidden window first; the WebView dialog only appears as fallback.
+- New singleton coordinator dedupes concurrent same-source resolves and serializes cross-source resolves.
+- Coil image errors no longer trigger silent solves to prevent hidden-window flashing.
+- Plugin loader gains Mihon/Tachiyomi bridge package compatibility (eu.kanade.tachiyomi.*, uy.kohesive.injekt.*, rx.*).
+- Plugin loader falls back to the host loader when a class is missing from the JAR instead of crashing.
+- Reader info bar shows a charging indicator (lightning bolt) when the device is plugged in.
+- Safer divide-by-zero and zero-height drawing guards in the reader info bar.
+- AdBlock and the existing per-source CloudFlare interception are preserved.

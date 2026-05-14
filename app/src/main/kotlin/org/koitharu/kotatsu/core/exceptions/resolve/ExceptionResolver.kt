@@ -48,6 +48,7 @@ import kotlin.coroutines.resume
 class ExceptionResolver private constructor(
     private val host: Host,
     private val settings: AppSettings,
+    private val captchaCoordinator: CaptchaAutoResolveCoordinator,
     private val scrobblerAuthHelperProvider: Provider<ScrobblerAuthHelper>,
 ) {
     private val continuations = MutableScatterMap<String, Continuation<Boolean>>(1)
@@ -131,9 +132,15 @@ class ExceptionResolver private constructor(
         browserActionContract.launch(e)
     }
 
-    private suspend fun resolveCF(e: CloudFlareProtectedException): Boolean = suspendCancellableCoroutine { cont ->
-        continuations[CloudFlareActivity.TAG] = cont
-        cloudflareContract.launch(e)
+    private suspend fun resolveCF(e: CloudFlareProtectedException): Boolean {
+        host.withContext {
+            Toast.makeText(this, R.string.captcha_solving, Toast.LENGTH_LONG).show()
+        }
+        // Delegated to the singleton coordinator: it owns the activity lifecycle, so the result is
+        // delivered even if this Fragment / Activity dies while CloudFlareActivity is still
+        // running. Same-source duplicate calls await the in-flight resolve. The coordinator tries
+        // a hidden silent solve first and falls back to the visible CloudFlareActivity on cancel.
+        return captchaCoordinator.resolve(e.source, e)
     }
 
     private suspend fun resolveAuthException(source: MangaSource): Boolean {
@@ -186,18 +193,21 @@ class ExceptionResolver private constructor(
 
     class Factory @Inject constructor(
         private val settings: AppSettings,
+        private val captchaCoordinator: CaptchaAutoResolveCoordinator,
         private val scrobblerAuthHelperProvider: Provider<ScrobblerAuthHelper>,
     ) {
 
         fun create(fragment: Fragment) = ExceptionResolver(
             host = Host.FragmentHost(fragment),
             settings = settings,
+            captchaCoordinator = captchaCoordinator,
             scrobblerAuthHelperProvider = scrobblerAuthHelperProvider,
         )
 
         fun create(activity: FragmentActivity) = ExceptionResolver(
             host = Host.ActivityHost(activity),
             settings = settings,
+            captchaCoordinator = captchaCoordinator,
             scrobblerAuthHelperProvider = scrobblerAuthHelperProvider,
         )
     }
