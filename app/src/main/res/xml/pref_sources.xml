@@ -28,6 +28,12 @@
 
     <SwitchPreferenceCompat
         android:defaultValue="false"
+        android:key="auto_plugins"
+        android:summary="@string/auto_update_plugins_summary"
+        android:title="@string/auto_update_plugins" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
         android:key="sources_enabled_all"
         android:summary="@string/enable_all_sources_summary"
         android:title="@string/enable_all_sources"

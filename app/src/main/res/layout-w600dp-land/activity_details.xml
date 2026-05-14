@@ -13,6 +13,7 @@
 		android:id="@+id/appbar"
 		android:layout_width="0dp"
 		android:layout_height="wrap_content"
+		android:background="@android:color/transparent"
 		android:elevation="0dp"
 		android:fitsSystemWindows="true"
 		app:elevation="0dp"

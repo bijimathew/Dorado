@@ -89,7 +89,7 @@ object DynamicParserManager {
 					}
 				}
 				loaders[jar.name] = classLoader
-			} catch (e: Exception) {
+			} catch (e: Throwable) {
 				Log.w(TAG, "Failed to load parser plugin ${jar.name}", e)
 			}
 		}

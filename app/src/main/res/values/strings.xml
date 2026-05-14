@@ -966,6 +966,8 @@
     <string name="password_reset">Password reset successfully</string>
     <string name="no_reset_token">No reset token provided</string>
     <string name="manage_plugins">Manage plugins</string>
+    <string name="auto_update_plugins">Auto-update plugins</string>
+    <string name="auto_update_plugins_summary">Periodically check installed plugins for new GitHub releases and update them in place</string>
     <string name="no_plugins_installed">No plugins installed</string>
     <string name="no_plugins_summary">Use the import action to add parser plugin JAR files.</string>
     <string name="load_success">Plugin imported and loaded successfully</string>

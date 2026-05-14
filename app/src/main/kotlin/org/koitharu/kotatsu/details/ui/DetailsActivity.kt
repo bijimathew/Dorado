@@ -546,6 +546,13 @@ class DetailsActivity :
 
 	private fun loadCover(imageUrl: String?) {
 		viewBinding.imageViewCover.setImageAsync(imageUrl, viewModel.getMangaOrNull())
+		viewBinding.imageViewCoverBg?.let { bg ->
+			val isVisible = !imageUrl.isNullOrBlank()
+			bg.isVisible = isVisible
+			if (isVisible) {
+				bg.setImageAsync(imageUrl, viewModel.getMangaOrNull())
+			}
+		}
 	}
 
 	private fun loadBackdrop(imageUrl: String?) {

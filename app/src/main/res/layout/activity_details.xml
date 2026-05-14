@@ -10,10 +10,24 @@
 	tools:ignore="ViewBindingType"
 	tools:viewBindingType="android.view.ViewGroup">
 
+	<org.koitharu.kotatsu.image.ui.CoverImageView
+		android:id="@+id/imageView_cover_bg"
+		android:layout_width="match_parent"
+		android:layout_height="420dp"
+		android:layout_gravity="top"
+		android:layout_marginTop="12dp"
+		android:alpha="0.25"
+		android:scaleType="centerCrop"
+		android:visibility="gone"
+		app:allowRgb565="true"
+		app:useExistingDrawable="true"
+		tools:ignore="ContentDescription,UnusedAttribute" />
+
 	<com.google.android.material.appbar.AppBarLayout
 		android:id="@+id/appbar"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
+		android:background="@android:color/transparent"
 		android:elevation="0dp"
 		android:fitsSystemWindows="true"
 		app:elevation="0dp"

@@ -209,6 +209,21 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val trackerDownloadStrategy: TrackerDownloadStrategy
 		get() = prefs.getEnumValue(KEY_TRACKER_DOWNLOAD, TrackerDownloadStrategy.DISABLED)
 
+	var isTrackerUnstuckMigrationDone: Boolean
+		get() = prefs.getBoolean(KEY_TRACKER_UNSTUCK_MIGRATION_DONE, false)
+		set(value) = prefs.edit { putBoolean(KEY_TRACKER_UNSTUCK_MIGRATION_DONE, value) }
+
+	var isTrackerProgressRefreshDone: Boolean
+		get() = prefs.getBoolean(KEY_TRACKER_PROGRESS_REFRESH_DONE, false)
+		set(value) = prefs.edit { putBoolean(KEY_TRACKER_PROGRESS_REFRESH_DONE, value) }
+
+	val isAutoPluginsEnabled: Boolean
+		get() = prefs.getBoolean(KEY_AUTO_PLUGINS, false)
+
+	var lastAutoPlugins: Long
+		get() = prefs.getLong(KEY_LAST_AUTO_PLUGINS, 0L)
+		set(value) = prefs.edit { putLong(KEY_LAST_AUTO_PLUGINS, value) }
+
 	var notificationSound: Uri
 		get() = prefs.getString(KEY_NOTIFICATIONS_SOUND, null)?.toUriOrNull()
 			?: Settings.System.DEFAULT_NOTIFICATION_URI
@@ -769,6 +784,10 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_TRACKER_NOTIFICATIONS = "tracker_notifications"
 		const val KEY_TRACKER_NO_NSFW = "tracker_no_nsfw"
 		const val KEY_TRACKER_DOWNLOAD = "tracker_download"
+		const val KEY_TRACKER_UNSTUCK_MIGRATION_DONE = "tracker_unstuck_migration_done"
+		const val KEY_TRACKER_PROGRESS_REFRESH_DONE = "tracker_progress_refresh_done"
+		const val KEY_AUTO_PLUGINS = "auto_plugins"
+		const val KEY_LAST_AUTO_PLUGINS = "last_auto_plugins"
 		const val KEY_NOTIFICATIONS_SETTINGS = "notifications_settings"
 		const val KEY_NOTIFICATIONS_SOUND = "notifications_sound"
 		const val KEY_NOTIFICATIONS_VIBRATE = "notifications_vibrate"

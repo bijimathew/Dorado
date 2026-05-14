@@ -73,6 +73,7 @@ import org.koitharu.kotatsu.main.ui.owners.BottomNavOwner
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.remotelist.ui.MangaSearchMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionItemCallback
+import org.koitharu.kotatsu.settings.sources.manage.plugins.UpdatePluginsProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionListenerImpl
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionViewModel
@@ -90,6 +91,9 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 	@Inject
 	lateinit var settings: AppSettings
+
+	@Inject
+	lateinit var updatePluginsProvider: UpdatePluginsProvider
 
 	private val viewModel by viewModels<MainViewModel>()
 	private val searchSuggestionViewModel by viewModels<SearchSuggestionViewModel>()
@@ -163,6 +167,13 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 		super.onRestoreInstanceState(savedInstanceState)
 		adjustSearchUI(viewBinding.searchView.isShowing)
 		navigationDelegate.syncSelectedItem()
+	}
+
+	override fun onResume() {
+		super.onResume()
+		lifecycleScope.launch(Dispatchers.Default) {
+			updatePluginsProvider.runAutoUpdate(settings)
+		}
 	}
 
 	override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
