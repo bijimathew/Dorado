@@ -60,6 +60,9 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 	val isCaptchaNotificationsDisabled: Boolean
 		get() = prefs.getBoolean(KEY_NO_CAPTCHA, false)
 
+	val isCaptchaAutoResolveDisabled: Boolean
+		get() = prefs.getBoolean(KEY_NO_AUTO_CAPTCHA, false)
+
 	@Suppress("UNCHECKED_CAST")
 	override fun <T> get(key: ConfigKey<T>): T {
 		return when (key) {
@@ -106,6 +109,7 @@ class SourceSettings(context: Context, source: MangaSource) : MangaSourceConfig 
 
 		const val KEY_DOMAIN = "domain"
 		const val KEY_NO_CAPTCHA = "no_captcha"
+		const val KEY_NO_AUTO_CAPTCHA = "no_auto_captcha"
 		const val KEY_SLOWDOWN = "slowdown"
 		const val KEY_SORT_ORDER = "sort_order"
 

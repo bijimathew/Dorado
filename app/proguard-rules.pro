@@ -69,6 +69,10 @@
 -keep interface rx.** { *; }
 -dontwarn rx.**
 
+-keep class keiyoushi.** { *; }
+-keep interface keiyoushi.** { *; }
+-dontwarn keiyoushi.**
+
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 -keeppackagenames okhttp3.**
@@ -104,6 +108,15 @@
 }
 -keepclassmembers class **$$serializer {
     *** INSTANCE;
+}
+# Hosted Mihon/Tachiyomi extensions may use kotlinx.serialization without the @Serializable
+# annotation (e.g. hand-written KSerializer Companions). Keep Companion + serializer() lookup +
+# nested descriptor classes referenced by $$serializer so dynamically-loaded extension code can
+# still resolve serializers at runtime.
+-keep,includedescriptorclasses class **$$serializer { *; }
+-keepclassmembers class * {
+    *** Companion;
+    kotlinx.serialization.KSerializer serializer(...);
 }
 -dontwarn kotlinx.serialization.**
 

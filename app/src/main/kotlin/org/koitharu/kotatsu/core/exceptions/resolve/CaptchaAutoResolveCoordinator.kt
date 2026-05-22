@@ -2,6 +2,9 @@ package org.koitharu.kotatsu.core.exceptions.resolve
 
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -10,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.browser.cloudflare.CloudFlareActivity
 import org.koitharu.kotatsu.core.exceptions.CloudFlareProtectedException
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
@@ -41,6 +45,11 @@ class CaptchaAutoResolveCoordinator @Inject constructor(
 	private val mutex = Mutex()
 	private val inFlight = ConcurrentHashMap<MangaSource, CompletableDeferred<Boolean>>()
 	private val pendingActivityResult = ConcurrentHashMap<MangaSource, CompletableDeferred<Boolean>>()
+	// Wall-clock timestamps of the most recent successful resolve per source. Used to break tight
+	// loops where the WebView passes CloudFlare (so we report success) but the parser's next OkHttp
+	// request immediately hits CF again (different fingerprint) → new captcha event → new
+	// auto-resolve → toast retriggers every second.
+	private val recentSuccessAt = ConcurrentHashMap<MangaSource, Long>()
 
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -51,10 +60,21 @@ class CaptchaAutoResolveCoordinator @Inject constructor(
 
 	suspend fun resolve(source: MangaSource, exception: CloudFlareProtectedException): Boolean {
 		inFlight[source]?.let { return it.await() }
+		val lastSuccess = recentSuccessAt[source]
+		if (lastSuccess != null && System.currentTimeMillis() - lastSuccess < RECENT_SUCCESS_COOLDOWN_MS) {
+			return false
+		}
 		val deferred: CompletableDeferred<Boolean> = mutex.withLock {
 			inFlight[source]?.let { return@withLock it }
+			val recheck = recentSuccessAt[source]
+			if (recheck != null && System.currentTimeMillis() - recheck < RECENT_SUCCESS_COOLDOWN_MS) {
+				return@withLock CompletableDeferred(false)
+			}
 			val fresh = CompletableDeferred<Boolean>()
 			inFlight[source] = fresh
+			// Toast only on the slow path: piggy-back awaiters via the fast path get no toast, so
+			// rapid captcha events stop stacking new toasts on top of the loading state.
+			showSolvingToast()
 			scope.launch { runOrchestration(source, exception, fresh) }
 			fresh
 		}
@@ -73,6 +93,9 @@ class CaptchaAutoResolveCoordinator @Inject constructor(
 			} else {
 				launchAndAwait(source, exception, hidden = false)
 			}
+			if (finalResult) {
+				recentSuccessAt[source] = System.currentTimeMillis()
+			}
 			deferred.complete(finalResult)
 		} catch (e: Throwable) {
 			e.printStackTraceDebug()
@@ -80,6 +103,12 @@ class CaptchaAutoResolveCoordinator @Inject constructor(
 		} finally {
 			inFlight.remove(source)
 			pendingActivityResult.remove(source)
+		}
+	}
+
+	private fun showSolvingToast() {
+		Handler(Looper.getMainLooper()).post {
+			Toast.makeText(context, R.string.captcha_solving, Toast.LENGTH_LONG).show()
 		}
 	}
 
@@ -102,5 +131,12 @@ class CaptchaAutoResolveCoordinator @Inject constructor(
 			context.startActivity(intent)
 		}
 		return resultDeferred.await()
+	}
+
+	private companion object {
+		// How long to refuse a fresh auto-resolve for the same source after a successful one. Long
+		// enough to break the "WebView passes, parser still fails, captcha event re-fires" loop;
+		// short enough that a legitimate retry minutes later goes through normally.
+		const val RECENT_SUCCESS_COOLDOWN_MS = 30_000L
 	}
 }

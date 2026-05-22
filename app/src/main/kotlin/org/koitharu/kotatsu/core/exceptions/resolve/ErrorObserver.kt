@@ -12,9 +12,12 @@ import androidx.lifecycle.coroutineScope
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.koitharu.kotatsu.core.exceptions.CloudFlareProtectedException
 import org.koitharu.kotatsu.core.nav.router
+import org.koitharu.kotatsu.core.prefs.SourceSettings
 import org.koitharu.kotatsu.core.util.ext.findActivity
 import org.koitharu.kotatsu.core.util.ext.viewLifecycleScope
+import kotlin.coroutines.coroutineContext
 
 abstract class ErrorObserver(
 	protected val host: View,
@@ -33,6 +36,24 @@ abstract class ErrorObserver(
 
 	protected fun canResolve(error: Throwable): Boolean {
 		return resolver != null && ExceptionResolver.canResolve(error)
+	}
+
+	/**
+	 * For CloudFlare captcha errors, awaits the silent resolve flow before falling through to the
+	 * caller's error UI. Returns `true` only when auto-resolve actually succeeded (caller should skip
+	 * its error UI and call [onResolved] is invoked here); returns `false` when the error isn't CF,
+	 * the source has auto-solve disabled, or the auto-resolve attempt failed (caller shows the
+	 * standard error UI with a manual "Solve" button).
+	 */
+	protected suspend fun tryAutoResolve(error: Throwable): Boolean {
+		if (error !is CloudFlareProtectedException || resolver == null || !canResolve(error)) return false
+		val ctx = host.context
+		if (ctx != null && SourceSettings(ctx, error.source).isCaptchaAutoResolveDisabled) return false
+		val resolved = resolver.resolve(error, tryAutoResolve = true)
+		if (resolved && coroutineContext.isActive) {
+			onResolved?.accept(true)
+		}
+		return resolved
 	}
 
 	protected fun router() = fragment?.router ?: (activity as? FragmentActivity)?.router

@@ -75,7 +75,8 @@ class CaptchaHandler @Inject constructor(
 	private val mutex = Mutex()
 
 	@CheckResult
-	suspend fun handle(exception: CloudFlareException): Boolean = handleException(exception.source, exception, true)
+	suspend fun handle(exception: CloudFlareException, tryAutoResolve: Boolean = true): Boolean =
+		handleException(exception.source, exception, notify = true, tryAutoResolve = tryAutoResolve)
 
 	suspend fun discard(source: MangaSource) {
 		handleException(source, null, true)
@@ -113,6 +114,7 @@ class CaptchaHandler @Inject constructor(
 		if (
 			tryAutoResolve &&
 			exception != null &&
+			!SourceSettings(context, source).isCaptchaAutoResolveDisabled &&
 			webViewExecutor.tryResolveCaptcha(exception, RESOLVE_TIMEOUT)
 		) {
 			return@withContext true

@@ -3,6 +3,7 @@ package org.koitharu.kotatsu.browser
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Looper
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -31,6 +32,20 @@ open class BrowserClient(
 	override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
 		super.onPageStarted(view, url, favicon)
 		callback.onLoadingStateChanged(isLoading = true)
+	}
+
+	override fun onReceivedError(
+		view: WebView?,
+		request: WebResourceRequest?,
+		error: WebResourceError?,
+	) {
+		super.onReceivedError(view, request, error)
+		// Main-frame load errors (DNS, TLS, offline, 4xx/5xx) often skip onPageFinished, leaving the
+		// toolbar spinner stuck. Flip isLoading=false here so the UI recovers. Guarded on isForMainFrame
+		// so a single blocked sub-resource can't kill the spinner while the main page is still loading.
+		if (request?.isForMainFrame == true) {
+			callback.onLoadingStateChanged(isLoading = false)
+		}
 	}
 
 	override fun onPageCommitVisible(view: WebView, url: String) {

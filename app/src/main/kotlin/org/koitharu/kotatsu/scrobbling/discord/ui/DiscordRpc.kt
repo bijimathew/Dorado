@@ -93,7 +93,7 @@ class DiscordRpc @Inject constructor(
 					applicationId = appId,
 					name = appName,
 					details = manga.title,
-					state = context.getString(R.string.chapter_d_of_d, state.chapterNumber, state.chaptersTotal),
+					state = state.getChapterTitle(context.resources),
 					type = 3,
 					timestamps = Timestamps(
 						start = lastActivity?.timestamps?.start ?: System.currentTimeMillis(),

@@ -31,6 +31,7 @@ import org.koitharu.kotatsu.core.util.ext.setTabsEnabled
 import org.koitharu.kotatsu.core.util.ext.setTextAndVisible
 import org.koitharu.kotatsu.databinding.FragmentFavouritesContainerBinding
 import org.koitharu.kotatsu.databinding.ItemEmptyStateBinding
+import org.koitharu.kotatsu.favourites.ui.list.FavouritesListFragment
 
 @AndroidEntryPoint
 class FavouritesContainerFragment : BaseFragment<FragmentFavouritesContainerBinding>(),
@@ -43,6 +44,8 @@ class FavouritesContainerFragment : BaseFragment<FragmentFavouritesContainerBind
 
 	override val recyclerView: RecyclerView?
 		get() = (findCurrentFragment() as? RecyclerViewOwner)?.recyclerView
+
+	val categoryId: Long? get() = (findCurrentFragment() as? FavouritesListFragment)?.categoryId
 
 	override fun onCreateViewBinding(
 		inflater: LayoutInflater,

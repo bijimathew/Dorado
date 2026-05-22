@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.onEach
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.bookmarks.ui.AllBookmarksFragment
 import org.koitharu.kotatsu.core.nav.AppRouter
+import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.NavItem
 import org.koitharu.kotatsu.core.ui.util.RecyclerViewOwner
@@ -40,6 +41,7 @@ import org.koitharu.kotatsu.databinding.NavigationRailFabBinding
 import org.koitharu.kotatsu.explore.ui.ExploreFragment
 import org.koitharu.kotatsu.favourites.ui.container.FavouritesContainerFragment
 import org.koitharu.kotatsu.history.ui.HistoryListFragment
+import org.koitharu.kotatsu.list.ui.config.ListConfigSection
 import org.koitharu.kotatsu.local.ui.LocalListFragment
 import org.koitharu.kotatsu.suggestions.ui.SuggestionsFragment
 import org.koitharu.kotatsu.tracker.ui.feed.FeedFragment
@@ -232,8 +234,14 @@ class MainNavigationDelegate(
 	}
 
 	private fun onNavigationItemReselected() {
-		val recyclerView = (primaryFragment as? RecyclerViewOwner)?.recyclerView ?: return
-		recyclerView.smoothScrollToTop()
+		val fragment = primaryFragment ?: return
+		when (fragment) {
+			is HistoryListFragment -> fragment.router.showListConfigSheet(ListConfigSection.History)
+			is FavouritesContainerFragment -> fragment.categoryId?.let { id ->
+				fragment.router.showListConfigSheet(ListConfigSection.Favorites(id))
+			}
+			is RecyclerViewOwner -> fragment.recyclerView?.smoothScrollToTop()
+		}
 	}
 
 	private fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
