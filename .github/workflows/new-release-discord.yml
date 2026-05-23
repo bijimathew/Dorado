@@ -11,18 +11,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send release embed to Discord
-        uses: tsickert/discord-webhook@v7.0.0
-        with:
-          webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          content: "<@&1435675462759088168>"
-          embed-title: "🚀 New Release: ${{ github.event.repository.name }} v${{ github.event.release.tag_name }}"
-          embed-url: "${{ github.event.release.html_url }}"
-          embed-description: "${{ github.event.release.body }}"
-          embed-color: 3447003
-          embed-author-name: "${{ github.actor }}"
-          embed-author-icon-url: "https://github.com/${{ github.actor }}.png"
-          embed-footer-text: "Release published on main"
-          embed-timestamp: "${{ github.event.release.published_at }}"
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          REPO: ${{ github.event.repository.name }}
+          TAG: ${{ github.event.release.tag_name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+          ACTOR: ${{ github.actor }}
+          TIMESTAMP: ${{ github.event.release.published_at }}
+        run: |
+          jq -n \
+            --arg content "<@&1506992583744684175>" \
+            --arg title "🚀 New Release: ${REPO} v${TAG}" \
+            --arg url "${URL}" \
+            --arg description "${BODY}" \
+            --arg author_name "${ACTOR}" \
+            --arg author_icon "https://github.com/${ACTOR}.png" \
+            --arg footer "Release published on main" \
+            --arg timestamp "${TIMESTAMP}" \
+            '{
+              content: $content,
+              allowed_mentions: { roles: ["1506992583744684175"] },
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $description,
+                color: 3447003,
+                author: { name: $author_name, icon_url: $author_icon },
+                footer: { text: $footer },
+                timestamp: $timestamp
+              }]
+            }' | curl -fsS -H "Content-Type: application/json" -X POST -d @- "$WEBHOOK"
 
   prereleaseNotification:
     if: ${{ github.event.release.prerelease == true }}
@@ -30,14 +49,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send prerelease embed to Discord
-        uses: tsickert/discord-webhook@v7.0.0
-        with:
-          webhook-url: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
-          embed-title: "🧪 Pre-Release: ${{ github.event.repository.name }} ${{ github.event.release.tag_name }}"
-          embed-url: "${{ github.event.release.html_url }}"
-          embed-description: "${{ github.event.release.body }}"
-          embed-color: 15105570
-          embed-author-name: "${{ github.actor }}"
-          embed-author-icon-url: "https://github.com/${{ github.actor }}.png"
-          embed-footer-text: "Pre-release build"
-          embed-timestamp: "${{ github.event.release.published_at }}"
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          REPO: ${{ github.event.repository.name }}
+          TAG: ${{ github.event.release.tag_name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+          ACTOR: ${{ github.actor }}
+          TIMESTAMP: ${{ github.event.release.published_at }}
+        run: |
+          jq -n \
+            --arg title "🧪 Pre-Release: ${REPO} ${TAG}" \
+            --arg url "${URL}" \
+            --arg description "${BODY}" \
+            --arg author_name "${ACTOR}" \
+            --arg author_icon "https://github.com/${ACTOR}.png" \
+            --arg footer "Pre-release build" \
+            --arg timestamp "${TIMESTAMP}" \
+            '{
+              allowed_mentions: { parse: [] },
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $description,
+                color: 15105570,
+                author: { name: $author_name, icon_url: $author_icon },
+                footer: { text: $footer },
+                timestamp: $timestamp
+              }]
+            }' | curl -fsS -H "Content-Type: application/json" -X POST -d @- "$WEBHOOK"

@@ -9,14 +9,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send issue embed to Discord
-        uses: tsickert/discord-webhook@v7.0.0
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          embed-title: "New Issue: ${{ github.event.issue.title }}"
-          embed-url: "${{ github.event.issue.html_url }}"
-          embed-description: "${{ github.event.issue.body }}"
-          embed-color: 5814783
-          embed-author-name: "${{ github.event.issue.user.login }}"
-          embed-author-icon-url: "${{ github.event.issue.user.avatar_url }}"
-          embed-footer-text: "Issue #${{ github.event.issue.number }}"
-          embed-timestamp: "${{ github.event.issue.created_at }}"
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_ISSUE_WEBHOOK }}
+          TITLE: ${{ github.event.issue.title }}
+          URL: ${{ github.event.issue.html_url }}
+          BODY: ${{ github.event.issue.body }}
+          USER_LOGIN: ${{ github.event.issue.user.login }}
+          USER_AVATAR: ${{ github.event.issue.user.avatar_url }}
+          NUMBER: ${{ github.event.issue.number }}
+          TIMESTAMP: ${{ github.event.issue.created_at }}
+        run: |
+          jq -n \
+            --arg title "New Issue: ${TITLE}" \
+            --arg url "${URL}" \
+            --arg description "${BODY}" \
+            --arg author_name "${USER_LOGIN}" \
+            --arg author_icon "${USER_AVATAR}" \
+            --arg footer "Issue #${NUMBER}" \
+            --arg timestamp "${TIMESTAMP}" \
+            '{
+              allowed_mentions: { parse: [] },
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: $description,
+                color: 5814783,
+                author: { name: $author_name, icon_url: $author_icon },
+                footer: { text: $footer },
+                timestamp: $timestamp
+              }]
+            }' | curl -fsS -H "Content-Type: application/json" -X POST -d @- "$WEBHOOK"
