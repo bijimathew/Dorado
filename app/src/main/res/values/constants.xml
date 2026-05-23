@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<string name="url_github" translatable="false">https://github.com/glitch-228/Kaisoku</string>
-	<string name="url_discord" translatable="false">TBD at 30+stars</string>
-	<string name="url_telegram_web" translatable="false">TBD at 30+stars</string>
-	<string name="url_telegram" translatable="false">TBD at 30+stars</string>
+	<string name="url_discord" translatable="false">https://discord.gg/gSabQBGGnj</string>
+	<string name="url_telegram_web" translatable="false">https://t.me/KaisokuApp</string>
+	<string name="url_telegram" translatable="false">tg://resolve?domain=KaisokuApp</string>
 	<string name="url_weblate" translatable="false">https://hosted.weblate.org/engage/kotatsu</string>
 	<string name="url_user_manual" translatable="false">https://github.com/glitch-228/Kaisoku/blob/devel/README.md</string>
 	<string name="url_error_report" translatable="false">https://github.com/glitch-228/Kaisoku/issues/new/choose</string>
