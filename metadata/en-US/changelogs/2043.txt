@@ -1,0 +1,10 @@
+- Fixed LikeManga: chapters and pages now load again.
+- New source setting: "Disable automatic CAPTCHA solving" (per source).
+- CAPTCHA errors now fall back to a manual "Solve" button when auto-solve fails, instead of silently giving up.
+- Browser toolbar spinner no longer gets stuck after a failed page load.
+- "Solving captcha..." toast no longer stacks on top of itself.
+- Background recommendations no longer trigger captcha dialogs.
+- Improved compatibility with Mihon / Tachiyomi extension plugins.
+- Reselecting History or Favourites in the bottom bar now opens the list filter sheet.
+- Discord Rich Presence now shows the actual chapter title.
+- Misc reliability fixes for the CloudFlare flow.
