@@ -1,0 +1,13 @@
+- Reader: new "Floating bottom bar" toggle with rounded corners + side margins (Settings → Reader).
+- Reader: adjustable top and bottom bar opacity (50–100%); slider re-tints to match.
+- AMOLED dark theme: bottom navigation bar is now pure black.
+- Details: "Related manga" panel now respects the global "Disable NSFW content" setting.
+- Tracker: transparently retries flaky sources (transient network errors and rate-limited sources).
+- Tracker: imported manga with existing reading history now recognize new chapters from the very first check.
+- Migrate: parallel fetching makes source migration noticeably faster.
+- New sources: MangaK (en), SoftKomik (id).
+- Fixed: LikeManga reliably loads chapters and pages again.
+- Indonesian sources: domain updates (CosmicScans, KomikMama, Luvyaa, ManhwaIndo and others); marked many permanently dead sources as broken so they no longer waste tracker time.
+- Fixed: AinzScans, YuriLab, MangaTv (es), MangaBuddy, TrueManga, RaijinScans (fr), HariManga, TomiloLib (ru), Rawkuma.
+- Discord and Telegram community links now active in Settings → About.
+- Misc: broader CloudFlare challenge detection.
