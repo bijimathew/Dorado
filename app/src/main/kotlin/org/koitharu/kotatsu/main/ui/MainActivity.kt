@@ -5,6 +5,8 @@ import android.app.BackgroundServiceStartNotAllowedException
 import android.app.ServiceStartNotAllowedException
 import android.content.Intent
 import android.content.pm.PackageManager.PERMISSION_GRANTED
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -13,6 +15,8 @@ import androidx.activity.viewModels
 import androidx.appcompat.view.ActionMode
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.toColorInt
 import androidx.core.view.MenuProvider
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
@@ -32,6 +36,7 @@ import com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_
 import com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_NO_SCROLL
 import com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
 import com.google.android.material.appbar.AppBarLayout.LayoutParams.SCROLL_FLAG_SNAP
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.search.SearchView
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +84,7 @@ import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionViewModel
 import org.koitharu.kotatsu.search.ui.suggestion.adapter.SearchSuggestionAdapter
 import javax.inject.Inject
+import androidx.appcompat.R as appcompatR
 import com.google.android.material.R as materialR
 
 @AndroidEntryPoint
@@ -158,6 +164,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 		viewModel.isBottomNavPinned.observe(this, ::setNavbarPinned)
 		searchSuggestionViewModel.isIncognitoModeEnabled.observe(this, this::onIncognitoModeChanged)
 		viewBinding.bottomNav?.addOnLayoutChangeListener(this)
+		applyAmoledNavbarTintIfNeeded()
 		viewBinding.searchView.addTransitionListener(this)
 		viewBinding.searchView.addTransitionListener(exitCallback)
 		initSearch()
@@ -409,6 +416,27 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 		)
 		ItemTouchHelper(SearchSuggestionItemCallback(this))
 			.attachToRecyclerView(viewBinding.recyclerViewSearch)
+	}
+
+	/**
+	 * When the user picked the AMOLED dark theme, force the bottom-nav background to pure black
+	 * (instead of the Material surface tint that bleeds gray at the bottom of the screen on AMOLED
+	 * panels) and tint the items so a selection is still visible against the black background.
+	 * Active item / icon use the theme's primary color; inactive items use a translucent white so
+	 * they don't disappear entirely.
+	 */
+	private fun applyAmoledNavbarTintIfNeeded() {
+		if (!isDarkAmoledTheme()) return
+		val bottomNav = viewBinding.bottomNav ?: return
+		val primary = MaterialColors.getColor(bottomNav, appcompatR.attr.colorPrimary, Color.WHITE)
+		bottomNav.setBackgroundColor(Color.BLACK)
+		val itemTint = ColorStateList(
+			arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+			intArrayOf(primary, "#99FFFFFF".toColorInt()),
+		)
+		bottomNav.itemTextColor = itemTint
+		bottomNav.itemIconTintList = itemTint
+		bottomNav.itemActiveIndicatorColor = ColorStateList.valueOf(ColorUtils.setAlphaComponent(primary, 38))
 	}
 
 	private fun setNavbarPinned(isPinned: Boolean) {

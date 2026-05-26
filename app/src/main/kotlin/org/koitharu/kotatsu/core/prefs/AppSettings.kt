@@ -442,6 +442,18 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val isReaderBarTransparent: Boolean
 		get() = prefs.getBoolean(KEY_READER_BAR_TRANSPARENT, true)
 
+	/** Reader top bar opacity, 50–100; 100 = opaque, 50 = ~50% see-through. */
+	val readerTopBarOpacity: Int
+		get() = prefs.getInt(KEY_READER_TOP_BAR_OPACITY, 50).coerceIn(50, 100)
+
+	/** Reader bottom bar opacity, 50–100; 100 = opaque. */
+	val readerBottomBarOpacity: Int
+		get() = prefs.getInt(KEY_READER_BOTTOM_BAR_OPACITY, 50).coerceIn(50, 100)
+
+	/** When true, the reader's bottom bar floats with side margins + rounded corners. */
+	val isReaderFloatBar: Boolean
+		get() = prefs.getBoolean(KEY_READER_FLOAT_BAR, true)
+
 	val isReaderChapterToastEnabled: Boolean
 		get() = prefs.getBoolean(KEY_READER_CHAPTER_TOAST, true)
 
@@ -840,6 +852,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_READER_MULTITASK = "reader_multitask"
 		const val KEY_READER_BAR = "reader_bar"
 		const val KEY_READER_BAR_TRANSPARENT = "reader_bar_transparent"
+		const val KEY_READER_TOP_BAR_OPACITY = "reader_top_bar_opacity"
+		const val KEY_READER_BOTTOM_BAR_OPACITY = "reader_bottom_bar_opacity"
+		const val KEY_READER_FLOAT_BAR = "reader_float_bar"
 		const val KEY_READER_CHAPTER_TOAST = "reader_chapter_toast"
 		const val KEY_READER_BACKGROUND = "reader_background"
 		const val KEY_READER_SCREEN_ON = "reader_screen_on"

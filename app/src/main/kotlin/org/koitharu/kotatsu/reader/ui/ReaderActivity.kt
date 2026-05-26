@@ -3,7 +3,9 @@ package org.koitharu.kotatsu.reader.ui
 import android.app.assist.AssistContent
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
@@ -13,6 +15,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.Insets
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isGone
@@ -72,6 +75,8 @@ import org.koitharu.kotatsu.reader.ui.tapgrid.TapGridDispatcher
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import androidx.appcompat.R as appcompatR
+import com.google.android.material.R as materialR
+import com.google.android.material.color.MaterialColors
 
 @AndroidEntryPoint
 class ReaderActivity :
@@ -118,6 +123,22 @@ class ReaderActivity :
     // Tracks whether the foldable device is in an unfolded state (half-opened or flat)
     private var isFoldUnfolded: Boolean = false
 
+    // Cached navigation-bar bottom inset so applyBottomBarLayout can position the floating bar
+    // correctly between calls without re-querying WindowInsetsCompat.
+    private var systemBarsBottomInset: Int = 0
+
+    // Cached system-bar insets so applyBottomBarLayout can keep the non-floating bar's side margins
+    // matching the system gutters.
+    private var lastSystemBarsInsets: Insets = Insets.NONE
+
+    private val readerBarsPrefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            AppSettings.KEY_READER_TOP_BAR_OPACITY,
+            AppSettings.KEY_READER_BOTTOM_BAR_OPACITY,
+            AppSettings.KEY_READER_FLOAT_BAR -> applyReaderBarsAppearance()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(ActivityReaderBinding.inflate(layoutInflater))
@@ -132,6 +153,8 @@ class ReaderActivity :
         viewBinding.buttonTimer?.setOnClickListener(this)
         idlingDetector.bindToLifecycle(this)
         screenOrientationHelper.applySettings()
+        applyReaderBarsAppearance()
+        settings.subscribe(readerBarsPrefListener)
         viewModel.isBookmarkAdded.observe(this) { viewBinding.actionsView.isBookmarkAdded = it }
         scrollTimer.isActive.observe(this) {
             updateScrollTimerButton()
@@ -218,6 +241,11 @@ class ReaderActivity :
     override fun onPause() {
         super.onPause()
         viewModel.onPause()
+    }
+
+    override fun onDestroy() {
+        settings.unsubscribe(readerBarsPrefListener)
+        super.onDestroy()
     }
 
     override fun onStop() {
@@ -402,30 +430,94 @@ class ReaderActivity :
     override fun onApplyWindowInsets(v: View, insets: WindowInsetsCompat): WindowInsetsCompat {
         gestureInsets = insets.getInsets(WindowInsetsCompat.Type.systemGestures())
         val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+        val navigationBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+        lastSystemBarsInsets = systemBars
+        systemBarsBottomInset = navigationBars.bottom
         viewBinding.toolbar.updateLayoutParams<ViewGroup.MarginLayoutParams> {
             topMargin = systemBars.top
             rightMargin = systemBars.right
             leftMargin = systemBars.left
         }
         if (viewBinding.toolbarDocked != null) {
-            viewBinding.actionsView.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                bottomMargin = systemBars.bottom
-                rightMargin = systemBars.right
-                leftMargin = systemBars.left
-            }
+            applyBottomBarLayout()
         }
         viewBinding.infoBar.updatePadding(
             top = systemBars.top,
         )
+        val bottomInset = viewBinding.toolbarDocked?.takeIf { it.isVisible }?.let { card ->
+            val lp = card.layoutParams as? CoordinatorLayout.LayoutParams
+            card.height + (lp?.bottomMargin ?: 0)
+        } ?: systemBars.bottom
         val innerInsets = Insets.of(
             systemBars.left,
             if (viewBinding.appbarTop.isVisible) viewBinding.appbarTop.height else systemBars.top,
             systemBars.right,
-            viewBinding.toolbarDocked?.takeIf { it.isVisible }?.height ?: systemBars.bottom,
+            bottomInset,
         )
         return WindowInsetsCompat.Builder(insets)
             .setInsets(WindowInsetsCompat.Type.systemBars(), innerInsets)
             .build()
+    }
+
+    /**
+     * Maps the user's 50–100 opacity slider to an alpha byte (0–255). 100 → 255 (opaque),
+     * 50 → 128 (~50% see-through). The original linear formula from Usagi.
+     */
+    private fun readerBarBgAlpha(opacity: Int): Int {
+        val t = opacity.coerceIn(50, 100)
+        return (255 - (100 - t) * 127f / 50f).toInt().coerceIn(0, 255)
+    }
+
+    /** Re-applies the top + bottom bar background tints (and layout) per current settings. */
+    private fun applyReaderBarsAppearance() {
+        val barColor = MaterialColors.getColor(viewBinding.root, materialR.attr.colorSurfaceContainer)
+        val topTinted = ColorUtils.setAlphaComponent(barColor, readerBarBgAlpha(settings.readerTopBarOpacity))
+        viewBinding.appbarTop.setBackgroundColor(topTinted)
+        viewBinding.toolbar.setBackgroundColor(Color.TRANSPARENT)
+        applyBottomBarLayout()
+    }
+
+    /**
+     * Positions the bottom bar (the MaterialCardView wrapper around [actionsView]) per the float-bar
+     * setting and re-tints its background per the bottom-bar opacity. Floating mode adds horizontal
+     * margins, lifts it off the nav-bar gutter, and shows rounded corners + elevation; docked mode
+     * pins it to the bottom edge with no margins.
+     */
+    private fun applyBottomBarLayout() {
+        val card = viewBinding.toolbarDocked as? com.google.android.material.card.MaterialCardView ?: return
+        val floatGap = resources.getDimensionPixelSize(R.dimen.reader_toolbar_float_gap)
+        val floating = settings.isReaderFloatBar
+        val bgAlpha = readerBarBgAlpha(settings.readerBottomBarOpacity)
+        val barColor = MaterialColors.getColor(card, materialR.attr.colorSurfaceContainer)
+        card.setCardBackgroundColor(ColorUtils.setAlphaComponent(barColor, bgAlpha))
+        viewBinding.actionsView.setBarBackgroundAlpha(bgAlpha)
+        val lp = card.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+        if (floating) {
+            val marginH = resources.getDimensionPixelSize(R.dimen.reader_toolbar_float_margin_h)
+            lp.leftMargin = marginH
+            lp.rightMargin = marginH
+            lp.bottomMargin = systemBarsBottomInset + floatGap
+            card.radius = resources.getDimension(R.dimen.reader_toolbar_corner_radius)
+            card.elevation = if (bgAlpha >= 255) {
+                resources.getDimension(R.dimen.reader_toolbar_float_elevation)
+            } else {
+                0f
+            }
+        } else {
+            lp.leftMargin = 0
+            lp.rightMargin = 0
+            lp.bottomMargin = 0
+            card.radius = 0f
+            card.elevation = 0f
+        }
+        card.layoutParams = lp
+        viewBinding.actionsView.minimumHeight = getThemeDimensionPixelOffset(appcompatR.attr.actionBarSize)
+        viewBinding.actionsView.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+            topMargin = 0
+            rightMargin = if (floating) 0 else lastSystemBarsInsets.right
+            leftMargin = if (floating) 0 else lastSystemBarsInsets.left
+            bottomMargin = if (floating) 0 else lastSystemBarsInsets.bottom
+        }
     }
 
     override fun switchPageBy(delta: Int) {

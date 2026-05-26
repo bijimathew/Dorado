@@ -152,6 +152,30 @@
 
 	<SwitchPreferenceCompat
 		android:defaultValue="true"
+		android:key="reader_float_bar"
+		android:summary="@string/reader_float_bar_summary"
+		android:title="@string/reader_float_bar" />
+
+	<org.koitharu.kotatsu.settings.utils.SliderPreference
+		android:key="reader_top_bar_opacity"
+		android:stepSize="5"
+		android:title="@string/reader_top_bar_opacity"
+		android:valueFrom="50"
+		android:valueTo="100"
+		app:defaultValue="50"
+		app:tickVisible="true" />
+
+	<org.koitharu.kotatsu.settings.utils.SliderPreference
+		android:key="reader_bottom_bar_opacity"
+		android:stepSize="5"
+		android:title="@string/reader_bottom_bar_opacity"
+		android:valueFrom="50"
+		android:valueTo="100"
+		app:defaultValue="50"
+		app:tickVisible="true" />
+
+	<SwitchPreferenceCompat
+		android:defaultValue="true"
 		android:key="reader_chapter_toast"
 		android:summary="@string/reader_chapter_toast_summary"
 		android:title="@string/reader_chapter_toast" />

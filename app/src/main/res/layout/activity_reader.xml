@@ -75,14 +75,17 @@
 
 	</com.google.android.material.appbar.AppBarLayout>
 
-	<com.google.android.material.dockedtoolbar.DockedToolbarLayout
+	<com.google.android.material.card.MaterialCardView
 		android:id="@+id/toolbar_docked"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
-		android:layout_gravity="bottom"
-		android:fitsSystemWindows="false"
+		android:layout_gravity="bottom|center_horizontal"
+		android:layout_marginStart="@dimen/reader_toolbar_float_margin_h"
+		android:layout_marginEnd="@dimen/reader_toolbar_float_margin_h"
+		android:elevation="@dimen/reader_toolbar_float_elevation"
 		app:cardBackgroundColor="?colorSurfaceContainer"
-		app:layout_insetEdge="bottom">
+		app:cardCornerRadius="@dimen/reader_toolbar_corner_radius"
+		app:strokeWidth="0dp">
 
 		<org.koitharu.kotatsu.reader.ui.ReaderActionsView
 			android:id="@+id/actionsView"
@@ -90,7 +93,7 @@
 			android:layout_height="wrap_content"
 			android:minHeight="?actionBarSize" />
 
-	</com.google.android.material.dockedtoolbar.DockedToolbarLayout>
+	</com.google.android.material.card.MaterialCardView>
 
 	<org.koitharu.kotatsu.reader.ui.ReaderToastView
 		android:id="@+id/toastView"

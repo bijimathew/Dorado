@@ -2,6 +2,7 @@ package org.koitharu.kotatsu.reader.ui
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.database.ContentObserver
 import android.provider.Settings
 import android.util.AttributeSet
@@ -12,8 +13,10 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.annotation.AttrRes
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.slider.Slider
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
@@ -30,6 +33,7 @@ import org.koitharu.kotatsu.details.ui.pager.ChaptersPagesSheet
 import org.koitharu.kotatsu.details.ui.pager.ChaptersPagesSheet.Companion.TAB_PAGES
 import org.koitharu.kotatsu.reader.ui.ReaderControlDelegate.OnInteractionListener
 import javax.inject.Inject
+import androidx.appcompat.R as appcompatR
 import com.google.android.material.R as materialR
 
 @AndroidEntryPoint
@@ -187,6 +191,25 @@ class ReaderActionsView @JvmOverloads constructor(
 		binding.buttonTimer.setIconResource(
 			if (isActive) R.drawable.ic_timer_run else R.drawable.ic_timer,
 		)
+	}
+
+	/**
+	 * Re-tints the slider track to follow the bottom-bar opacity so a translucent bar doesn't end
+	 * up with a fully-saturated slider painted on top of it. [bgAlpha] is 0–255 (255 = opaque).
+	 */
+	fun setBarBackgroundAlpha(bgAlpha: Int) {
+		if (!binding.slider.isVisible) return
+		val inactiveBase = MaterialColors.getColor(this, materialR.attr.colorSurfaceVariant)
+		val activeBase = MaterialColors.getColor(this, appcompatR.attr.colorPrimary)
+		if (bgAlpha >= 255) {
+			binding.slider.trackInactiveTintList = ColorStateList.valueOf(inactiveBase)
+			binding.slider.trackActiveTintList = ColorStateList.valueOf(activeBase)
+		} else {
+			val inactiveAlpha = (bgAlpha * 0.55f).toInt().coerceIn(48, 200)
+			val activeAlpha = (bgAlpha * 0.9f).toInt().coerceIn(inactiveAlpha + 24, 255)
+			binding.slider.trackInactiveTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(inactiveBase, inactiveAlpha))
+			binding.slider.trackActiveTintList = ColorStateList.valueOf(ColorUtils.setAlphaComponent(activeBase, activeAlpha))
+		}
 	}
 
 	private fun updateControlsVisibility() {

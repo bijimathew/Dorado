@@ -82,4 +82,10 @@
 
 	<dimen name="chip_icon_corner">3dp</dimen>
 	<dimen name="read_button_min_width">92dp</dimen>
+
+	<!-- Reader bottom-bar customization (3e4bcfd port). -->
+	<dimen name="reader_toolbar_float_margin_h">12dp</dimen>
+	<dimen name="reader_toolbar_float_gap">12dp</dimen>
+	<dimen name="reader_toolbar_corner_radius">20dp</dimen>
+	<dimen name="reader_toolbar_float_elevation">6dp</dimen>
 </resources>
