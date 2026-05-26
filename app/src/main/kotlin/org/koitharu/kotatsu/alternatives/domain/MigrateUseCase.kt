@@ -2,6 +2,9 @@ package org.koitharu.kotatsu.alternatives.domain
 
 import androidx.room.withTransaction
 import coil3.request.CachePolicy
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.db.migrations.MangaIdentityMerge
 import org.koitharu.kotatsu.core.model.getPreferredBranch
@@ -18,6 +21,7 @@ import org.koitharu.kotatsu.parsers.model.MangaChapter
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.scrobbling.common.domain.Scrobbler
 import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingStatus
+import org.koitharu.kotatsu.scrobbling.common.domain.tryScrobble
 import org.koitharu.kotatsu.tracker.data.TrackEntity
 import javax.inject.Inject
 
@@ -34,23 +38,38 @@ constructor(
 		oldManga: Manga,
 		newManga: Manga,
 	): Manga {
-		val oldDetails = if (oldManga.chapters.isNullOrEmpty()) {
-			runCatchingCancellable {
-				mangaRepositoryFactory.create(oldManga.source).getDetails(oldManga)
-			}.getOrDefault(oldManga)
-		} else {
-			oldManga
-		}.withStoredIdOf(oldManga)
-		val newDetails = if (newManga.chapters.isNullOrEmpty() || newManga.isSameStoredEntryAs(oldDetails)) {
-			mangaRepositoryFactory.create(newManga.source).getFreshDetails(newManga)
-		} else {
-			newManga
+		// Fetch old + new details in parallel — both are independent network calls and on slow
+		// sources this halves the wait the user sees before the migration actually starts. The
+		// `newManga.isSameStoredEntryAs(oldDetails)` check needs oldDetails first; resolve that on
+		// the fast path by checking against oldManga's stored id, which is what the original code
+		// effectively did via `withStoredIdOf`.
+		val (oldDetailsRaw, newDetailsRaw) = coroutineScope {
+			val oldDeferred = async {
+				if (oldManga.chapters.isNullOrEmpty()) {
+					runCatchingCancellable {
+						mangaRepositoryFactory.create(oldManga.source).getDetails(oldManga)
+					}.getOrDefault(oldManga)
+				} else {
+					oldManga
+				}
+			}
+			val newDeferred = async {
+				if (newManga.chapters.isNullOrEmpty() || newManga.isSameStoredEntryAs(oldManga)) {
+					mangaRepositoryFactory.create(newManga.source).getFreshDetails(newManga)
+				} else {
+					newManga
+				}
+			}
+			oldDeferred.await() to newDeferred.await()
 		}
+		val oldDetails = oldDetailsRaw.withStoredIdOf(oldManga)
+		val newDetails = newDetailsRaw
 		mangaDataRepository.storeManga(newDetails, replaceExisting = true)
 		if (oldDetails.id == newDetails.id) {
 			progressUpdateUseCase(newDetails)
 			return newDetails
 		}
+		var newHistory: HistoryEntity? = null
 		database.withTransaction {
 			// replace favorites
 			val favoritesDao = database.getFavouritesDao()
@@ -68,15 +87,12 @@ constructor(
 			// replace history
 			val historyDao = database.getHistoryDao()
 			val oldHistory = historyDao.find(oldDetails.id)
-			val newHistory =
-				if (oldHistory != null) {
-					val newHistory = makeNewHistory(oldDetails, newDetails, oldHistory)
-					historyDao.delete(oldDetails.id)
-					historyDao.upsert(newHistory)
-					newHistory
-				} else {
-					null
-				}
+			if (oldHistory != null) {
+				val history = makeNewHistory(oldDetails, newDetails, oldHistory)
+				historyDao.delete(oldDetails.id)
+				historyDao.upsert(history)
+				newHistory = history
+			}
 			// track
 			val tracksDao = database.getTracksDao()
 			val oldTrack = tracksDao.find(oldDetails.id)
@@ -95,33 +111,40 @@ constructor(
 				tracksDao.delete(oldDetails.id)
 				tracksDao.upsert(newTrack)
 			}
-			// scrobbling
-			for (scrobbler in scrobblers) {
-				if (!scrobbler.isEnabled) {
-					continue
-				}
-				val prevInfo = scrobbler.getScrobblingInfoOrNull(oldDetails.id) ?: continue
-				scrobbler.unregisterScrobbling(oldDetails.id)
-				scrobbler.linkManga(newDetails.id, prevInfo.targetId)
-				scrobbler.updateScrobblingInfo(
-					mangaId = newDetails.id,
-					rating = prevInfo.rating,
-					status =
-						prevInfo.status ?: when {
-							newHistory == null -> ScrobblingStatus.PLANNED
-							newHistory.percent == 1f -> ScrobblingStatus.COMPLETED
-							else -> ScrobblingStatus.READING
-						},
-					comment = prevInfo.comment,
-				)
-				if (newHistory != null) {
-					scrobbler.scrobble(
-						manga = newDetails,
-						chapterId = newHistory.chapterId,
-					)
-				}
-			}
 			MangaIdentityMerge.mergeManga(database.openHelper.writableDatabase, oldDetails.id, newDetails.id)
+		}
+		// Scrobbling runs outside the DB transaction: each scrobbler hits the network and the
+		// transaction shouldn't stay open for the whole thing. Each scrobbler runs in parallel so
+		// one slow service doesn't block the others, and a failure in one doesn't break the migration
+		// or stop the rest.
+		val scrobblerWork = scrobblers.filter { it.isEnabled }.mapNotNull { scrobbler ->
+			val prevInfo = scrobbler.getScrobblingInfoOrNull(oldDetails.id) ?: return@mapNotNull null
+			scrobbler to prevInfo
+		}
+		if (scrobblerWork.isNotEmpty()) {
+			coroutineScope {
+				scrobblerWork.map { (scrobbler, prevInfo) ->
+					async {
+						runCatchingCancellable {
+							scrobbler.unregisterScrobbling(oldDetails.id)
+							scrobbler.linkManga(newDetails.id, prevInfo.targetId)
+							scrobbler.updateScrobblingInfo(
+								mangaId = newDetails.id,
+								rating = prevInfo.rating,
+								status = prevInfo.status ?: when {
+									newHistory == null -> ScrobblingStatus.PLANNED
+									newHistory?.percent == 1f -> ScrobblingStatus.COMPLETED
+									else -> ScrobblingStatus.READING
+								},
+								comment = prevInfo.comment,
+							)
+							newHistory?.let { h ->
+								scrobbler.tryScrobble(newDetails, h.chapterId)
+							}
+						}
+					}
+				}.awaitAll()
+			}
 		}
 		progressUpdateUseCase(newDetails)
 		return newDetails

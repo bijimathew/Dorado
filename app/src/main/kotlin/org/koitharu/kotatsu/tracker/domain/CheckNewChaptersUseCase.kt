@@ -1,7 +1,9 @@
 package org.koitharu.kotatsu.tracker.domain
 
+import android.os.DeadObjectException
 import android.util.Log
 import coil3.request.CachePolicy
+import kotlinx.coroutines.delay
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.core.model.getPreferredBranch
 import org.koitharu.kotatsu.core.model.isLocal
@@ -18,6 +20,7 @@ import org.koitharu.kotatsu.parsers.util.findById
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.tracker.domain.model.MangaTracking
 import org.koitharu.kotatsu.tracker.domain.model.MangaUpdates
+import java.io.IOException
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,7 +45,10 @@ class CheckNewChaptersUseCase @Inject constructor(
 	}
 
 	suspend operator fun invoke(track: MangaTracking): MangaUpdates = mutex.withLock(track.manga.id) {
-		invokeImpl(track)
+		// Re-fetch from the repository so we work with the latest stored state — protects against
+		// drift if the track was modified between the batch snapshot and this invocation.
+		val fresh = repository.getTrackOrNull(track.manga)?.takeUnless { it.isEmpty() } ?: track
+		invokeImpl(fresh)
 	}
 
 	suspend operator fun invoke(manga: Manga, currentChapterId: Long) = mutex.withLock(manga.id) {
@@ -78,9 +84,10 @@ class CheckNewChaptersUseCase @Inject constructor(
 
 	private suspend fun invokeImpl(track: MangaTracking): MangaUpdates = runCatchingCancellable {
 		val details = getFullManga(track.manga)
-		val historyChapterId = historyRepository.getOne(track.manga)?.chapterId ?: 0L
+		val history = historyRepository.getOne(track.manga)
+		val historyChapterId = history?.chapterId ?: 0L
 		val branch = getBranch(details, track.lastChapterId, historyChapterId)
-		compare(track, details, branch, historyChapterId)
+		compare(track, details, branch, historyChapterId, history?.chaptersCount ?: 0)
 	}.getOrElse { error ->
 		MangaUpdates.Failure(
 			manga = track.manga,
@@ -101,15 +108,38 @@ class CheckNewChaptersUseCase @Inject constructor(
 		return manga.getPreferredBranch(null)
 	}
 
-	private suspend fun getFullManga(manga: Manga): Manga = when {
-		manga.isLocal -> fetchDetails(
-			requireNotNull(localMangaRepository.getRemoteManga(manga)) {
-				"Local manga is not supported"
-			},
-		)
+	private suspend fun getFullManga(manga: Manga): Manga = retryOnTransient {
+		when {
+			manga.isLocal -> fetchDetails(
+				requireNotNull(localMangaRepository.getRemoteManga(manga)) {
+					"Local manga is not supported"
+				},
+			)
 
-		manga.chapters.isNullOrEmpty() -> fetchDetails(manga)
-		else -> manga
+			manga.chapters.isNullOrEmpty() -> fetchDetails(manga)
+			else -> manga
+		}
+	}
+
+	/**
+	 * Retries [block] on transient IO failures (network blips, dropped sockets, dead binder). Bounded
+	 * to [TRANSIENT_RETRY_ATTEMPTS] tries with a short exponential backoff so a flaky source can't
+	 * burn extra wall-clock time on permanent errors.
+	 */
+	private suspend fun <T> retryOnTransient(block: suspend () -> T): T {
+		var currentDelay = TRANSIENT_RETRY_INITIAL_DELAY_MS
+		repeat(TRANSIENT_RETRY_ATTEMPTS - 1) {
+			try {
+				return block()
+			} catch (e: IOException) {
+				delay(currentDelay)
+				currentDelay = (currentDelay * 2).coerceAtMost(TRANSIENT_RETRY_MAX_DELAY_MS)
+			} catch (e: DeadObjectException) {
+				delay(currentDelay)
+				currentDelay = (currentDelay * 2).coerceAtMost(TRANSIENT_RETRY_MAX_DELAY_MS)
+			}
+		}
+		return block()
 	}
 
 	private suspend fun fetchDetails(manga: Manga): Manga {
@@ -141,9 +171,20 @@ class CheckNewChaptersUseCase @Inject constructor(
 		manga: Manga,
 		branch: String?,
 		historyChapterId: Long,
+		historyCount: Int,
 	): MangaUpdates.Success {
 		if (track.isEmpty()) {
-			// first check or manga was empty on last check
+			// First check or manga was empty on last check. If the user has reading history that
+			// already counted N chapters, treat those as the baseline so anything beyond N can be
+			// flagged on this very first run instead of silently re-baselining.
+			if (historyCount > 0) {
+				val chapters = manga.getChapters(branch)
+				if (chapters.size > historyCount) {
+					val newCount = chapters.size - historyCount
+					return MangaUpdates.Success(manga, branch, chapters.takeLast(newCount), isValid = true)
+				}
+				return MangaUpdates.Success(manga, branch, emptyList(), isValid = true)
+			}
 			return MangaUpdates.Success(manga, branch, emptyList(), isValid = false)
 		}
 		val chapters = requireNotNull(manga.getChapters(branch))
@@ -204,5 +245,11 @@ class CheckNewChaptersUseCase @Inject constructor(
 			newChapters.size == chapters.size -> null
 			else -> MangaUpdates.Success(manga, branch, newChapters, isValid = true)
 		}
+	}
+
+	private companion object {
+		const val TRANSIENT_RETRY_ATTEMPTS = 3
+		const val TRANSIENT_RETRY_INITIAL_DELAY_MS = 1_000L
+		const val TRANSIENT_RETRY_MAX_DELAY_MS = 4_000L
 	}
 }

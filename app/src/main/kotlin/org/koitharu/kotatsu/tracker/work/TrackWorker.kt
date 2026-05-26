@@ -30,6 +30,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.map
@@ -130,16 +131,7 @@ class TrackWorker @AssistedInject constructor(
 			for (track in tracks) {
 				launch {
 					semaphore.withPermit {
-						send(
-							runCatchingCancellable {
-								checkNewChaptersUseCase.invoke(track)
-							}.getOrElse { error ->
-								MangaUpdates.Failure(
-									manga = track.manga,
-									error = error,
-								)
-							},
-						)
+						send(checkWithRetry(track))
 					}
 				}
 			}
@@ -170,6 +162,29 @@ class TrackWorker @AssistedInject constructor(
 				}
 			}
 		}.toList()
+	}
+
+	/**
+	 * Wraps the per-track [CheckNewChaptersUseCase] call in a bounded retry that only kicks in for
+	 * [MangaUpdates.Failure.shouldRetry] — currently rate-limit errors ([TooManyRequestExceptions]).
+	 * Permanent failures return on the first attempt so we don't burn battery on broken sources.
+	 */
+	private suspend fun checkWithRetry(track: MangaTracking): MangaUpdates {
+		var last: MangaUpdates = MangaUpdates.Failure(track.manga, null)
+		repeat(MAX_RETRY_ATTEMPTS) { attempt ->
+			val result = runCatchingCancellable {
+				checkNewChaptersUseCase.invoke(track)
+			}.getOrElse { error ->
+				MangaUpdates.Failure(manga = track.manga, error = error)
+			}
+			last = result
+			val shouldRetry = result is MangaUpdates.Failure && result.shouldRetry()
+			if (!shouldRetry) return result
+			if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+				delay(RETRY_DELAY_MS * (attempt + 1L))
+			}
+		}
+		return last
 	}
 
 	override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -337,6 +352,8 @@ class TrackWorker @AssistedInject constructor(
 		const val TAG = "tracking"
 		const val TAG_ONESHOT = "tracking_oneshot"
 		const val MAX_PARALLELISM = 6
+		const val MAX_RETRY_ATTEMPTS = 5
+		const val RETRY_DELAY_MS = 10_000L
 		val BATCH_SIZE = if (BuildConfig.DEBUG) 20 else 46
 		const val SETTINGS_ACTION_CODE = 5
 	}
