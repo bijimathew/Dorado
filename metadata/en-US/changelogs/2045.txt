@@ -1,0 +1,3 @@
+- Alternatives: new "Migrate to another manga…" action in the overflow menu — open search, prefilled with the source title, refine the query inline, and tap any result to migrate progress to it.
+- Appearance: new "Pure black bottom navigation" toggle (Settings → Appearance, under "Black"). Lets you keep the AMOLED background while restoring the default Material tint on the bottom nav. Default stays the pure-black look.
+- Mihon extensions: bundled the kotlinx-serialization-json-okio runtime so sources that decode JSON straight from an okio source (e.g. Shinigami) no longer crash with "Failed resolution of OkioStreamsKt".
