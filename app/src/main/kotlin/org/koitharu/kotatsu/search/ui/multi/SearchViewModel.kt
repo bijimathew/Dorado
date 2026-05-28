@@ -58,7 +58,8 @@ class SearchViewModel @Inject constructor(
 	private val favouritesRepository: FavouritesRepository,
 ) : BaseViewModel() {
 
-	val query = savedStateHandle.get<String>(AppRouter.KEY_QUERY).orEmpty()
+	var query = savedStateHandle.get<String>(AppRouter.KEY_QUERY).orEmpty()
+		private set
 	val kind = savedStateHandle.get<SearchKind>(AppRouter.KEY_KIND) ?: SearchKind.SIMPLE
 
 	private var includeDisabledSources = MutableStateFlow(false)
@@ -120,6 +121,13 @@ class SearchViewModel @Inject constructor(
 		results.value = emptyList()
 		includeDisabledSources.value = false
 		doSearch()
+	}
+
+	fun search(newQuery: String) {
+		val trimmed = newQuery.trim()
+		if (trimmed.isEmpty() || trimmed == query) return
+		query = trimmed
+		retry()
 	}
 
 	fun setPinnedOnly(value: Boolean) {

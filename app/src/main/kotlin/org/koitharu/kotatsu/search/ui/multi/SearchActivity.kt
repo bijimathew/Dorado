@@ -1,5 +1,7 @@
 package org.koitharu.kotatsu.search.ui.multi
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuInflater
@@ -7,14 +9,20 @@ import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
 import androidx.appcompat.view.ActionMode
+import androidx.appcompat.widget.SearchView
+import androidx.core.view.MenuProvider
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.exceptions.resolve.SnackbarErrorObserver
+import org.koitharu.kotatsu.core.model.getTitle
+import org.koitharu.kotatsu.core.model.parcelable.ParcelableManga
+import org.koitharu.kotatsu.core.nav.AppRouter
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.BaseActivity
+import org.koitharu.kotatsu.core.ui.dialog.buildAlertDialog
 import org.koitharu.kotatsu.core.ui.list.ListSelectionController
 import org.koitharu.kotatsu.core.ui.list.OnListItemClickListener
 import org.koitharu.kotatsu.core.ui.widgets.TipView
@@ -49,10 +57,12 @@ class SearchActivity :
 
 	private val viewModel by viewModels<SearchViewModel>()
 	private lateinit var selectionController: ListSelectionController
+	private var pickMode: Boolean = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		setContentView(ActivitySearchBinding.inflate(layoutInflater))
+		pickMode = intent.getBooleanExtra(AppRouter.KEY_PICK_MODE, false)
 		title = when (viewModel.kind) {
 			SearchKind.SIMPLE,
 			SearchKind.TITLE -> viewModel.query
@@ -92,9 +102,14 @@ class SearchActivity :
 		viewBinding.recyclerView.addItemDecoration(TypedListSpacingDecoration(this, true))
 
 		setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
-		supportActionBar?.setSubtitle(R.string.search_results)
+		supportActionBar?.setSubtitle(
+			if (pickMode) R.string.manga_migration else R.string.search_results,
+		)
 
 		addMenuProvider(SearchMenuProvider(this, viewModel))
+		if (pickMode) {
+			addMenuProvider(PickModeSearchMenuProvider())
+		}
 
 		viewModel.list.observe(this, adapter)
 		viewModel.onError.observeEvent(this, SnackbarErrorObserver(viewBinding.recyclerView, null))
@@ -117,9 +132,39 @@ class SearchActivity :
 	}
 
 	override fun onItemClick(item: MangaListModel, view: View) {
+		if (pickMode) {
+			confirmPick(item)
+			return
+		}
 		if (!selectionController.onItemClick(item.id)) {
 			router.openDetails(item.toMangaWithOverride())
 		}
+	}
+
+	private fun confirmPick(item: MangaListModel) {
+		val target = item.toMangaWithOverride()
+		buildAlertDialog(this, isCentered = true) {
+			setTitle(R.string.manga_migration)
+			setMessage(
+				getString(
+					R.string.migrate_to_manga_confirmation,
+					target.title,
+					target.source.getTitle(context),
+				),
+			)
+			setNegativeButton(android.R.string.cancel, null)
+			setNeutralButton(R.string.details) { _, _ ->
+				router.openDetails(target)
+			}
+			setPositiveButton(R.string.migrate) { _, _ ->
+				val data = Intent().putExtra(
+					AppRouter.KEY_MANGA,
+					ParcelableManga(target, withDescription = false),
+				)
+				setResult(Activity.RESULT_OK, data)
+				finish()
+			}
+		}.show()
 	}
 
 	override fun onItemLongClick(item: MangaListModel, view: View): Boolean {
@@ -199,5 +244,35 @@ class SearchActivity :
 
 	private fun collectSelectedItems(): Set<Manga> {
 		return viewModel.getItems(selectionController.peekCheckedIds())
+	}
+
+	private inner class PickModeSearchMenuProvider :
+		MenuProvider,
+		SearchView.OnQueryTextListener {
+
+		override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+			menuInflater.inflate(R.menu.opt_search_pick, menu)
+			val menuItem = menu.findItem(R.id.action_search)
+			val searchView = menuItem.actionView as SearchView
+			searchView.queryHint = getString(R.string.search_manga)
+			searchView.setIconifiedByDefault(false)
+			searchView.maxWidth = Int.MAX_VALUE
+			searchView.setOnQueryTextListener(this)
+			searchView.setQuery(viewModel.query, false)
+			searchView.clearFocus()
+		}
+
+		override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+
+		override fun onQueryTextSubmit(query: String?): Boolean {
+			val q = query?.trim().orEmpty()
+			if (q.isNotEmpty()) {
+				viewModel.search(q)
+				this@SearchActivity.title = q
+			}
+			return true
+		}
+
+		override fun onQueryTextChange(newText: String?): Boolean = false
 	}
 }

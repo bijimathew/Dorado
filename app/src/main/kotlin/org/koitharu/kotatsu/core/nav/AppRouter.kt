@@ -750,6 +750,12 @@ class AppRouter private constructor(
             }
         }
 
+        fun pickMangaIntent(context: Context, query: String): Intent =
+            Intent(context, SearchActivity::class.java)
+                .putExtra(KEY_QUERY, query)
+                .putExtra(KEY_KIND, SearchKind.SIMPLE)
+                .putExtra(KEY_PICK_MODE, true)
+
         fun browserIntent(
             context: Context,
             url: String,
@@ -851,6 +857,7 @@ class AppRouter private constructor(
         const val KEY_MANGA = "manga"
         const val KEY_MANGA_LIST = "manga_list"
         const val KEY_PAGES = "pages"
+        const val KEY_PICK_MODE = "pick_mode"
         const val KEY_PREVIEW = "preview"
         const val KEY_QUERY = "query"
         const val KEY_READER_MODE = "reader_mode"

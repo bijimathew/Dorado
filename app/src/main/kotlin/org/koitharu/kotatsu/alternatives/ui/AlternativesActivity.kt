@@ -1,9 +1,13 @@
 package org.koitharu.kotatsu.alternatives.ui
 
 import android.os.Bundle
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.core.view.MenuProvider
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import coil3.ImageLoader
@@ -11,6 +15,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.exceptions.resolve.SnackbarErrorObserver
 import org.koitharu.kotatsu.core.model.getTitle
+import org.koitharu.kotatsu.core.nav.PickMangaContract
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.ui.BaseActivity
 import org.koitharu.kotatsu.core.ui.BaseListAdapter
@@ -42,6 +47,12 @@ class AlternativesActivity : BaseActivity<ActivityAlternativesBinding>(),
 
 	private val viewModel by viewModels<AlternativesViewModel>()
 
+	private val pickMangaLauncher = registerForActivityResult(PickMangaContract()) { target ->
+		if (target != null) {
+			confirmMigration(target)
+		}
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		setContentView(ActivityAlternativesBinding.inflate(layoutInflater))
@@ -68,6 +79,8 @@ class AlternativesActivity : BaseActivity<ActivityAlternativesBinding>(),
 			router.openDetails(it)
 			finishAfterTransition()
 		}
+
+		addMenuProvider(AlternativesMenuProvider())
 	}
 
 	override fun onApplyWindowInsets(
@@ -120,5 +133,20 @@ class AlternativesActivity : BaseActivity<ActivityAlternativesBinding>(),
 				viewModel.migrate(target)
 			}
 		}.show()
+	}
+
+	private inner class AlternativesMenuProvider : MenuProvider {
+		override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+			menuInflater.inflate(R.menu.opt_alternatives, menu)
+		}
+
+		override fun onMenuItemSelected(menuItem: MenuItem): Boolean = when (menuItem.itemId) {
+			R.id.action_pick_migration -> {
+				pickMangaLauncher.launch(viewModel.manga.title)
+				true
+			}
+
+			else -> false
+		}
 	}
 }

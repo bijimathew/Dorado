@@ -666,6 +666,8 @@
     <string name="migrate_confirmation">Manga \"%1$s\" from \"%2$s\" will be replaced with \"%3$s\" from \"%4$s\" in your history and favorites (if present)</string>
     <string name="manga_migration">Manga migration</string>
     <string name="migration_completed">Migration completed</string>
+    <string name="migrate_to_another_manga">Migrate to another manga…</string>
+    <string name="migrate_to_manga_confirmation">Migrate progress to \"%1$s\" from \"%2$s\"? Source and target may differ — proceed only if you\'re sure they refer to the same work.</string>
     <string name="delete_read_chapters">Delete read chapters</string>
     <string name="no_chapters_deleted">No chapters have been deleted</string>
     <string name="chapters_deleted_pattern">Removed %1$s, cleared %2$s</string>
