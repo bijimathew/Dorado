@@ -17,6 +17,7 @@ online content sources and Mihon/Tachiyomi-compatible extension support.**
 * Online [manga catalogues](https://github.com/glitch-228/kaisoku-parsers) (with 1200+ manga sources)
 * Regular source fixes and additions taken from other active forks
 * Mihon/Tachiyomi-compatible extensions, including extension repositories, direct repo-link import from Explore, in-app extension management, and app-private loading without system-wide APK installs
+* Usagi plugins
 * Search manga by name, genres and more filters
 * Favorites organized by user-defined categories
 * Reading history, bookmarks and incognito mode support
