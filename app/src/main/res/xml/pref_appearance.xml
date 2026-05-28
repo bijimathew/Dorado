@@ -22,6 +22,13 @@
         android:summary="@string/black_dark_theme_summary"
         android:title="@string/black_dark_theme" />
 
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:dependency="amoled_theme"
+        android:key="amoled_navbar"
+        android:summary="@string/amoled_navbar_summary"
+        android:title="@string/amoled_navbar" />
+
     <org.koitharu.kotatsu.settings.utils.ActivityListPreference
         android:key="app_locale"
         android:title="@string/language" />

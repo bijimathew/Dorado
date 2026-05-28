@@ -70,6 +70,9 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val isAmoledTheme: Boolean
 		get() = prefs.getBoolean(KEY_THEME_AMOLED, false)
 
+	val isAmoledNavBarEnabled: Boolean
+		get() = prefs.getBoolean(KEY_THEME_AMOLED_NAVBAR, true)
+
 	var mainNavItems: List<NavItem>
 		get() {
 			val raw = prefs.getString(KEY_NAV_MAIN, null)?.split(',')
@@ -764,6 +767,7 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_THEME = "theme"
 		const val KEY_COLOR_THEME = "color_theme"
 		const val KEY_THEME_AMOLED = "amoled_theme"
+		const val KEY_THEME_AMOLED_NAVBAR = "amoled_navbar"
 		const val KEY_OFFLINE_DISABLED = "no_offline"
 		const val KEY_PAGES_CACHE_CLEAR = "pages_cache_clear"
 		const val KEY_HTTP_CACHE_CLEAR = "http_cache_clear"

@@ -427,6 +427,7 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 	 */
 	private fun applyAmoledNavbarTintIfNeeded() {
 		if (!isDarkAmoledTheme()) return
+		if (!settings.isAmoledNavBarEnabled) return
 		val bottomNav = viewBinding.bottomNav ?: return
 		val primary = MaterialColors.getColor(bottomNav, appcompatR.attr.colorPrimary, Color.WHITE)
 		bottomNav.setBackgroundColor(Color.BLACK)
