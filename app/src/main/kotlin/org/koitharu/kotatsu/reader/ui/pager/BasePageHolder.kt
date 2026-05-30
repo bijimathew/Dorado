@@ -203,6 +203,16 @@ abstract class BasePageHolder<B : ViewBinding>(
 			}
 
 			is PageState.Loading -> {
+				// Skip preview-as-SSIV-source in webtoon mode. The WebtoonImageView
+				// sizes itself from the SSIV's sWidth/sHeight, so showing a thumbnail
+				// first locks the slot to the thumbnail's dimensions; the second
+				// setImage(full) updates minScale via adjustScale() but leaves the
+				// existing scale value applied to the (now wider) full image, which
+				// renders it at the wrong size. Standard reader is unaffected (it
+				// fits the page to the viewport regardless of source dimensions).
+				// Only nhentai.net sets MangaPage.preview today, which is exactly
+				// where this bug shows up.
+				if (this is WebtoonHolder) return
 				if (state.preview != null && ssiv.getState() == null) {
 					ssiv.setImage(state.preview)
 				}
