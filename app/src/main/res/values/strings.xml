@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name" translatable="false">Kaisoku</string>
+    <string name="extract_text">Extract text</string>
+    <string name="translate_page">Translate page</string>
+    <string name="copy">Copy</string>
+    <string name="ocr_recognizing">Recognizing…</string>
+    <string name="ocr_no_text">No text detected.</string>
+    <string name="translate_setup_required">Configure an AI provider in Settings → Reader → AI translation</string>
+    <string name="ai_translation">AI translation</string>
+    <string name="ai_translation_summary">OCR + translate a page via your own LLM API (BYOK)</string>
+    <string name="translate_provider">Provider</string>
+    <string name="translate_endpoint">API endpoint</string>
+    <string name="translate_api_key">API key</string>
+    <string name="translate_model">Model</string>
+    <string name="translate_custom_headers">Custom headers (JSON)</string>
+    <string name="translate_source_lang">Source language</string>
+    <string name="translate_target_lang">Target language</string>
+    <string name="translate_trigger_mode">Trigger</string>
+    <string name="translate_trigger_manual">Manual (menu)</string>
+    <string name="translate_trigger_auto">Auto on each page</string>
+    <string name="translate_overlay_bg">Overlay background</string>
+    <string name="translate_overlay_bg_summary">Paint a white box behind each translated bubble</string>
+    <string name="translate_concurrency">Concurrent requests</string>
+    <string name="translate_clear_cache">Clear translation cache</string>
+    <string name="translate_provider_openai">OpenAI-compatible</string>
+    <string name="translate_provider_gemini">Native Gemini</string>
+    <string name="lang_auto">Auto-detect</string>
     <string name="local_storage">Local storage</string>
     <string name="favourites">Favorites</string>
     <string name="history">History</string>

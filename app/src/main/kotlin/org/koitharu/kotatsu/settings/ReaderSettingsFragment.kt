@@ -8,10 +8,15 @@ import androidx.preference.ListPreference
 import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.core.model.ZoomMode
 import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.prefs.AppSettings
+import org.koitharu.kotatsu.reader.translate.TranslationCoordinator
 import org.koitharu.kotatsu.core.prefs.ReaderAnimation
 import org.koitharu.kotatsu.core.prefs.ReaderBackground
 import org.koitharu.kotatsu.core.prefs.ReaderControl
@@ -28,6 +33,11 @@ import org.koitharu.kotatsu.settings.utils.SliderPreference
 class ReaderSettingsFragment :
 	BasePreferenceFragment(R.string.reader_settings),
 	SharedPreferences.OnSharedPreferenceChangeListener {
+
+	@Inject
+	lateinit var translationCoordinator: TranslationCoordinator
+
+	private val cacheScope = MainScope()
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_reader)
@@ -85,8 +95,18 @@ class ReaderSettingsFragment :
 				true
 			}
 
+			AppSettings.KEY_TRANSLATE_CLEAR_CACHE -> {
+				cacheScope.launch { translationCoordinator.clearAll() }
+				true
+			}
+
 			else -> super.onPreferenceTreeClick(preference)
 		}
+	}
+
+	override fun onDestroy() {
+		cacheScope.cancel()
+		super.onDestroy()
 	}
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {

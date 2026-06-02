@@ -56,6 +56,47 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getBoolean(KEY_FIRST_LAUNCH, true)
 		set(value) = prefs.edit { putBoolean(KEY_FIRST_LAUNCH, value) }
 
+	var translateProvider: org.koitharu.kotatsu.reader.translate.TranslateProvider
+		get() = prefs.getEnumValue(KEY_TRANSLATE_PROVIDER, org.koitharu.kotatsu.reader.translate.TranslateProvider.OPENAI_COMPATIBLE)
+		set(value) = prefs.edit { putEnumValue(KEY_TRANSLATE_PROVIDER, value) }
+
+	var translateEndpoint: String
+		get() = prefs.getString(KEY_TRANSLATE_ENDPOINT, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_ENDPOINT, value) }
+
+	var translateApiKey: String
+		get() = prefs.getString(KEY_TRANSLATE_API_KEY, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_API_KEY, value) }
+
+	var translateModel: String
+		get() = prefs.getString(KEY_TRANSLATE_MODEL, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_MODEL, value) }
+
+	var translateCustomHeaders: String
+		get() = prefs.getString(KEY_TRANSLATE_CUSTOM_HEADERS, null).orEmpty()
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_CUSTOM_HEADERS, value) }
+
+	var translateSourceLanguage: String
+		get() = prefs.getString(KEY_TRANSLATE_SOURCE_LANG, null) ?: "auto"
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_SOURCE_LANG, value) }
+
+	var translateTargetLanguage: String
+		get() = prefs.getString(KEY_TRANSLATE_TARGET_LANG, null)
+			?: java.util.Locale.getDefault().language
+		set(value) = prefs.edit { putString(KEY_TRANSLATE_TARGET_LANG, value) }
+
+	var translateTriggerMode: org.koitharu.kotatsu.reader.translate.TranslateTriggerMode
+		get() = prefs.getEnumValue(KEY_TRANSLATE_TRIGGER_MODE, org.koitharu.kotatsu.reader.translate.TranslateTriggerMode.MANUAL)
+		set(value) = prefs.edit { putEnumValue(KEY_TRANSLATE_TRIGGER_MODE, value) }
+
+	var translateOverlayBackground: Boolean
+		get() = prefs.getBoolean(KEY_TRANSLATE_OVERLAY_BG, true)
+		set(value) = prefs.edit { putBoolean(KEY_TRANSLATE_OVERLAY_BG, value) }
+
+	var translateConcurrency: Int
+		get() = prefs.getInt(KEY_TRANSLATE_CONCURRENCY, 1).coerceIn(1, 4)
+		set(value) = prefs.edit { putInt(KEY_TRANSLATE_CONCURRENCY, value.coerceIn(1, 4)) }
+
 	var listMode: ListMode
 		get() = prefs.getEnumValue(KEY_LIST_MODE, ListMode.GRID)
 		set(value) = prefs.edit { putEnumValue(KEY_LIST_MODE, value) }
@@ -927,6 +968,18 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_DISCORD_RPC = "discord_rpc"
 		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
 		const val KEY_DISCORD_TOKEN = "discord_token"
+
+		const val KEY_TRANSLATE_PROVIDER = "translate_provider"
+		const val KEY_TRANSLATE_ENDPOINT = "translate_endpoint"
+		const val KEY_TRANSLATE_API_KEY = "translate_api_key"
+		const val KEY_TRANSLATE_MODEL = "translate_model"
+		const val KEY_TRANSLATE_CUSTOM_HEADERS = "translate_custom_headers"
+		const val KEY_TRANSLATE_SOURCE_LANG = "translate_source_lang"
+		const val KEY_TRANSLATE_TARGET_LANG = "translate_target_lang"
+		const val KEY_TRANSLATE_TRIGGER_MODE = "translate_trigger_mode"
+		const val KEY_TRANSLATE_OVERLAY_BG = "translate_overlay_bg"
+		const val KEY_TRANSLATE_CONCURRENCY = "translate_concurrency"
+		const val KEY_TRANSLATE_CLEAR_CACHE = "translate_clear_cache"
 
 		// keys for non-persistent preferences
 		const val KEY_APP_VERSION = "app_version"
