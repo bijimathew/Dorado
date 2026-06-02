@@ -326,4 +326,9 @@
 		<item name="drawableSize">@dimen/m3_chip_icon_size</item>
 	</style>
 
+	<style name="Widget.Kaisoku.BottomNavigationView.Expressive" parent="Widget.Material3Expressive.BottomNavigationView">
+		<item name="paddingBottomSystemWindowInsets">false</item>
+		<item name="itemPaddingTop">10dp</item>
+	</style>
+
 </resources>

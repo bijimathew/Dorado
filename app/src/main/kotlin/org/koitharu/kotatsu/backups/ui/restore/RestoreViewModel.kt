@@ -34,6 +34,11 @@ class RestoreViewModel @Inject constructor(
 
 	val availableEntries = MutableStateFlow<List<BackupSectionModel>>(emptyList())
 	val backupDate = MutableStateFlow<Date?>(null)
+	val isMergeEnabled = MutableStateFlow(false)
+
+	fun onMergeToggle(isChecked: Boolean) {
+		isMergeEnabled.value = isChecked
+	}
 
 	init {
 		launchLoadingJob(Dispatchers.Default) {

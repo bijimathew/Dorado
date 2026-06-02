@@ -178,7 +178,7 @@ class PluginsManageFragment :
 
 	private suspend fun askOverwrite(fileName: String): Boolean = withContext(Dispatchers.Main) {
 		suspendCancellableCoroutine { cont ->
-			val dialog = buildAlertDialog(requireContext()) {
+			val dialog = buildAlertDialog(requireContext(), isCentered = true) {
 				setTitle(R.string.overwrite_plugin)
 				setMessage(getString(R.string.overwrite_plugin_summary, fileName))
 				setNegativeButton(android.R.string.cancel) { _, _ ->

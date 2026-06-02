@@ -41,13 +41,17 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 		binding.recyclerView.adapter = adapter
 		binding.buttonCancel.setOnClickListener(this)
 		binding.buttonRestore.setOnClickListener(this)
+		binding.checkboxMerge.setOnCheckedChangeListener { _, isChecked ->
+			viewModel.onMergeToggle(isChecked)
+		}
 		viewModel.availableEntries.observe(viewLifecycleOwner, adapter)
 		viewModel.onError.observeEvent(viewLifecycleOwner, this::onError)
 		combine(
 			viewModel.isLoading,
 			viewModel.availableEntries,
 			viewModel.backupDate,
-			::Triple,
+			viewModel.isMergeEnabled,
+			::Quadruple,
 		).observe(viewLifecycleOwner, this::onLoadingChanged)
 	}
 
@@ -76,8 +80,8 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 		viewModel.onItemClick(item)
 	}
 
-	private fun onLoadingChanged(value: Triple<Boolean, List<BackupSectionModel>, Date?>) {
-		val (isLoading, entries, backupDate) = value
+	private fun onLoadingChanged(value: Quadruple<Boolean, List<BackupSectionModel>, Date?, Boolean>) {
+		val (isLoading, entries, backupDate, isMergeEnabled) = value
 		val hasEntries = entries.isNotEmpty()
 		with(requireViewBinding()) {
 			progressBar.isVisible = isLoading
@@ -88,6 +92,8 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 					hasEntries -> getString(R.string.processing_)
 					else -> getString(R.string.loading_)
 				}
+			checkboxMerge.isVisible = !isLoading && hasEntries
+			checkboxMerge.isChecked = isMergeEnabled
 			buttonRestore.isEnabled = !isLoading && entries.any { it.isChecked }
 		}
 	}
@@ -97,8 +103,16 @@ class RestoreDialogFragment : AlertDialogFragment<DialogRestoreBinding>(), OnLis
 			context ?: return false,
 			viewModel.uri ?: return false,
 			viewModel.getCheckedSections(),
+			viewModel.isMergeEnabled.value,
 		)
 	}
+
+	data class Quadruple<out A, out B, out C, out D>(
+		val first: A,
+		val second: B,
+		val third: C,
+		val fourth: D,
+	)
 
 	private fun Date.formatBackupDate(): String {
 		return getString(
