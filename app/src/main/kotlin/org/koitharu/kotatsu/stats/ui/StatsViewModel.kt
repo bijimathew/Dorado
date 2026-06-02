@@ -25,6 +25,7 @@ class StatsViewModel @Inject constructor(
 ) : BaseViewModel() {
 
 	val period = MutableStateFlow(StatsPeriod.WEEK)
+	val byGenre = MutableStateFlow(false)
 	val onActionDone = MutableEventFlow<ReversibleAction>()
 	val selectedCategories = MutableStateFlow<Set<Long>>(emptySet())
 	val favoriteCategories = favouritesRepository.observeCategories()
@@ -34,13 +35,14 @@ class StatsViewModel @Inject constructor(
 
 	init {
 		launchJob(Dispatchers.Default) {
-			combine<StatsPeriod, Set<Long>, Pair<StatsPeriod, Set<Long>>>(
+			combine(
 				period,
 				selectedCategories,
-				::Pair,
-			).collectLatest { p ->
+				byGenre,
+				::Triple,
+			).collectLatest { (p, categories, genre) ->
 				readingStats.value = withLoading {
-					repository.getReadingStats(p.first, p.second)
+					repository.getReadingStats(p, categories, genre)
 				}
 			}
 		}
