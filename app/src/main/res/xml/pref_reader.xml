@@ -150,6 +150,11 @@
 		android:key="reader_bar_transparent"
 		android:title="@string/reader_info_bar_transparent" />
 
+	<org.koitharu.kotatsu.settings.ReaderPreviewSettingsPreference
+		android:key="reader_bar_preview"
+		android:persistent="false"
+		android:selectable="false" />
+
 	<SwitchPreferenceCompat
 		android:defaultValue="true"
 		android:key="reader_float_bar"
