@@ -1,0 +1,5 @@
+- Backups: new "Merge with existing data" checkbox in the restore dialog — preserves your current settings/tap actions instead of wiping them on import.
+- Imports: added PDF support to the local "Import file" picker (each page becomes a chapter image).
+- Statistics: added a Manga/Genres toggle on the Reading Statistics screen so you can see total reading time grouped by genre.
+- Reader: settings now shows a live schematic preview of the top and bottom bars that updates as you change opacity or the floating-bar toggle.
+- Reader: webtoon mode no longer renders the preview thumbnail at the wrong scale.
