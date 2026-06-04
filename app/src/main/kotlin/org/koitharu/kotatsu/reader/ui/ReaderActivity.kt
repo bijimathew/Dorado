@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.viewModels
+import androidx.annotation.MainThread
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.Insets
@@ -119,6 +120,9 @@ class ReaderActivity :
     private var gestureInsets: Insets = Insets.NONE
     private lateinit var readerManager: ReaderManager
     private val hideUiRunnable = Runnable { setUiIsVisible(false) }
+    private val hideEInkFlashRunnable = Runnable { einkFlashView.isVisible = false }
+    private lateinit var einkFlashView: View
+    private var eInkFlashCounter = 0
 
     // Tracks whether the foldable device is in an unfolded state (half-opened or flat)
     private var isFoldUnfolded: Boolean = false
@@ -143,6 +147,7 @@ class ReaderActivity :
         super.onCreate(savedInstanceState)
         setContentView(ActivityReaderBinding.inflate(layoutInflater))
         readerManager = ReaderManager(supportFragmentManager, viewBinding.container, settings)
+        einkFlashView = createEInkFlashView()
         setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
         touchHelper = TapGridDispatcher(viewBinding.root, this)
         scrollTimer = scrollTimerFactory.create(resources, this, this)
@@ -611,6 +616,7 @@ class ReaderActivity :
         ) {
             viewBinding.toastView.showTemporary(chapterTitle, TOAST_DURATION)
         }
+        flashOnPageChanged(previous, uiState)
         if (uiState.isSliderAvailable()) {
             viewBinding.actionsView.setSliderValue(
                 value = uiState.currentPage,
@@ -622,6 +628,45 @@ class ReaderActivity :
         viewBinding.actionsView.isSliderEnabled = uiState.isSliderAvailable()
         viewBinding.actionsView.isNextEnabled = uiState.hasNextChapter()
         viewBinding.actionsView.isPrevEnabled = uiState.hasPreviousChapter()
+    }
+
+    private fun createEInkFlashView(): View {
+        return View(this).apply {
+            isVisible = false
+            isClickable = false
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            viewBinding.root.addView(
+                this,
+                CoordinatorLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+    }
+
+    @MainThread
+    private fun flashOnPageChanged(previous: ReaderUiState?, uiState: ReaderUiState) {
+        if (previous == null) return
+        if (previous.chapter.id == uiState.chapter.id && previous.currentPage == uiState.currentPage) return
+        if (!settings.isEInkFlashEnabled) {
+            eInkFlashCounter = 0
+            return
+        }
+        eInkFlashCounter++
+        if (eInkFlashCounter % settings.eInkFlashEvery == 0) {
+            showEInkFlash()
+        }
+    }
+
+    private fun showEInkFlash() {
+        einkFlashView.removeCallbacks(hideEInkFlashRunnable)
+        einkFlashView.animate().cancel()
+        einkFlashView.setBackgroundColor(settings.eInkFlashColor.colorInt)
+        einkFlashView.bringToFront()
+        einkFlashView.isVisible = true
+        einkFlashView.postDelayed(hideEInkFlashRunnable, settings.eInkFlashDuration.toLong())
     }
 
     private fun updateScrollTimerButton() {
