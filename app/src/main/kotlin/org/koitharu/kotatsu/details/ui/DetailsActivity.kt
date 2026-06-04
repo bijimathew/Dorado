@@ -25,7 +25,9 @@ import androidx.core.view.updatePaddingRelative
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.transition.TransitionManager
 import coil3.ImageLoader
+import coil3.request.ErrorResult
 import coil3.request.ImageRequest
+import coil3.request.SuccessResult
 import coil3.request.allowRgb565
 import coil3.request.crossfade
 import coil3.request.lifecycle
@@ -166,9 +168,19 @@ class DetailsActivity :
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			viewBinding.backdrop.setRenderEffect(
-				RenderEffect.createBlurEffect(24f, 24f, Shader.TileMode.CLAMP),
-			)
+			val blurListener = object : ImageRequest.Listener {
+				override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+					super.onSuccess(request, result)
+					updateBackdropBlur()
+				}
+
+				override fun onError(request: ImageRequest, result: ErrorResult) {
+					super.onError(request, result)
+					updateBackdropBlur()
+				}
+			}
+			viewBinding.backdrop.addImageRequestListener(blurListener)
+			updateBackdropBlur()
 		}
 		TitleScrollCoordinator(viewBinding.textViewTitle).attach(viewBinding.scrollView)
 		if (settings.isDescriptionExpanded) {
@@ -561,6 +573,27 @@ class DetailsActivity :
 		viewBinding.backdrop.setImageAsync(imageUrl, viewModel.getMangaOrNull())
 	}
 
+	/**
+	 * Recompute the backdrop blur radius from the drawable-to-view scale so the *visual* blur stays
+	 * consistent across sources. `RenderEffect` applies its radius in drawable-pixel space, but the
+	 * `centerCrop` ImageView upscales small covers (some sources return 280-px-wide art, others
+	 * 1200-px) to a ~1080-px-wide view — leaving a fixed radius wildly over-amplified on the small
+	 * ones. Scaling by `drawableWidth / viewWidth` keeps the on-screen blur identical.
+	 */
+	private fun updateBackdropBlur() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+		val backdrop = viewBinding.backdrop
+		val drawable = backdrop.drawable ?: return
+		val drawableWidth = drawable.intrinsicWidth
+		val viewWidth = backdrop.width
+		if (drawableWidth <= 0 || viewWidth <= 0) return
+		val targetPx = BACKDROP_TARGET_BLUR_DP * resources.displayMetrics.density
+		val radius = (targetPx * drawableWidth / viewWidth).coerceIn(2f, 80f)
+		backdrop.setRenderEffect(
+			RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
+		)
+	}
+
 	private fun showTextDialog(text: String) {
 		buildAlertDialog(this) {
 			setMessage(text)
@@ -618,5 +651,12 @@ class DetailsActivity :
 	companion object {
 
 		private const val FAV_LABEL_LIMIT = 16
+
+		/**
+		 * Visual backdrop blur radius in dp, applied to the rendered view (not to source pixels).
+		 * [updateBackdropBlur] scales the real `RenderEffect` radius from this so the on-screen
+		 * blur is the same regardless of how big the underlying cover image is.
+		 */
+		private const val BACKDROP_TARGET_BLUR_DP = 8f
 	}
 }
