@@ -81,7 +81,6 @@ import org.koitharu.kotatsu.core.util.ext.enqueueWith
 import org.koitharu.kotatsu.core.util.ext.getQuantityStringSafe
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
 import org.koitharu.kotatsu.core.util.ext.isTextTruncated
-import org.koitharu.kotatsu.core.util.ext.joinToStringWithLimit
 import org.koitharu.kotatsu.core.util.ext.mangaSourceExtra
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
@@ -152,7 +151,6 @@ class DetailsActivity :
 		infoBinding = LayoutDetailsTableBinding.bind(viewBinding.root)
 		setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
 		supportActionBar?.setDisplayShowTitleEnabled(false)
-		viewBinding.chipFavorite.setOnClickListener(this)
 		infoBinding.textViewLocal.setOnClickListener(this)
 		infoBinding.textViewSource.setOnClickListener(this)
 		viewBinding.imageViewCover.setOnClickListener(this)
@@ -237,11 +235,6 @@ class DetailsActivity :
 			R.id.textView_local -> {
 				val manga = viewModel.getMangaOrNull() ?: return
 				router.showLocalInfoDialog(manga)
-			}
-
-			R.id.chip_favorite -> {
-				val manga = viewModel.getMangaOrNull() ?: return
-				router.showFavoriteDialog(manga)
 			}
 
 			R.id.imageView_cover -> {
@@ -378,13 +371,7 @@ class DetailsActivity :
 	}
 
 	private fun onFavoritesChanged(categories: Set<FavouriteCategory>) {
-		val chip = viewBinding.chipFavorite
-		chip.setChipIconResource(if (categories.isEmpty()) R.drawable.ic_heart_outline else R.drawable.ic_heart)
-		chip.text = if (categories.isEmpty()) {
-			getString(R.string.add_to_favourites)
-		} else {
-			categories.joinToStringWithLimit(this, FAV_LABEL_LIMIT) { it.title }
-		}
+		invalidateOptionsMenu()
 	}
 
 	private fun onLocalSizeChanged(size: Long) {
@@ -653,8 +640,6 @@ class DetailsActivity :
 	}
 
 	companion object {
-
-		private const val FAV_LABEL_LIMIT = 16
 
 		/** Canonical pixel size we sample backdrop covers down to so blur stays consistent. */
 		private const val BACKDROP_CANONICAL_WIDTH_PX = 256
