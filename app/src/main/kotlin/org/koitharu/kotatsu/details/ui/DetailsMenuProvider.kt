@@ -52,6 +52,10 @@ class DetailsMenuProvider(
 		menu.findItem(R.id.action_scrobbling).isVisible = viewModel.isScrobblingAvailable
 		menu.findItem(R.id.action_online).isVisible = viewModel.remoteManga.value != null
 		menu.findItem(R.id.action_stats).isVisible = viewModel.isStatsAvailable.value
+		val isFavourite = viewModel.favouriteCategories.value.isNotEmpty()
+		menu.findItem(R.id.action_favourite).setIcon(
+			if (isFavourite) R.drawable.ic_heart else R.drawable.ic_heart_outline,
+		)
 	}
 
 	override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
@@ -59,6 +63,10 @@ class DetailsMenuProvider(
 		when (menuItem.itemId) {
 			R.id.action_share -> {
 				router.showShareDialog(manga)
+			}
+
+			R.id.action_favourite -> {
+				router.showFavoriteDialog(manga)
 			}
 
 			R.id.action_delete -> {
