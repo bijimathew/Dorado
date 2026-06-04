@@ -2,8 +2,10 @@ package org.koitharu.kotatsu.details.ui
 
 import android.app.assist.AssistContent
 import android.content.Context
+import android.graphics.Color
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.text.SpannedString
@@ -25,16 +27,17 @@ import androidx.core.view.updatePaddingRelative
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.transition.TransitionManager
 import coil3.ImageLoader
-import coil3.request.ErrorResult
 import coil3.request.ImageRequest
-import coil3.request.SuccessResult
 import coil3.request.allowRgb565
 import coil3.request.crossfade
 import coil3.request.lifecycle
 import coil3.request.transformations
 import coil3.size.Precision
+import coil3.size.Size as CoilSize
 import coil3.transform.RoundedCornersTransformation
+import androidx.core.graphics.ColorUtils
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.Flow
@@ -167,21 +170,7 @@ class DetailsActivity :
 		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			val blurListener = object : ImageRequest.Listener {
-				override fun onSuccess(request: ImageRequest, result: SuccessResult) {
-					super.onSuccess(request, result)
-					updateBackdropBlur()
-				}
-
-				override fun onError(request: ImageRequest, result: ErrorResult) {
-					super.onError(request, result)
-					updateBackdropBlur()
-				}
-			}
-			viewBinding.backdrop.addImageRequestListener(blurListener)
-			updateBackdropBlur()
-		}
+		setupBackdropChrome()
 		TitleScrollCoordinator(viewBinding.textViewTitle).attach(viewBinding.scrollView)
 		if (settings.isDescriptionExpanded) {
 			viewBinding.textViewDescription.maxLines = Int.MAX_VALUE - 1
@@ -574,23 +563,38 @@ class DetailsActivity :
 	}
 
 	/**
-	 * Recompute the backdrop blur radius from the drawable-to-view scale so the *visual* blur stays
-	 * consistent across sources. `RenderEffect` applies its radius in drawable-pixel space, but the
-	 * `centerCrop` ImageView upscales small covers (some sources return 280-px-wide art, others
-	 * 1200-px) to a ~1080-px-wide view — leaving a fixed radius wildly over-amplified on the small
-	 * ones. Scaling by `drawableWidth / viewWidth` keeps the on-screen blur identical.
+	 * Pin the backdrop image to a tiny canonical size and apply a fixed blur on top. Forcing the
+	 * input to a known small bitmap means a constant `RenderEffect` radius produces a constant
+	 * on-screen blur across every source, no matter what resolution it serves cover art at — and
+	 * sidesteps the race where a callback-driven radius update can miss the first frame.
+	 *
+	 * A bottom-anchored gradient scrim then fades the backdrop into the info-card surface colour
+	 * so the header reads as one continuous block instead of two stacked panels.
 	 */
-	private fun updateBackdropBlur() {
-		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+	private fun setupBackdropChrome() {
 		val backdrop = viewBinding.backdrop
-		val drawable = backdrop.drawable ?: return
-		val drawableWidth = drawable.intrinsicWidth
-		val viewWidth = backdrop.width
-		if (drawableWidth <= 0 || viewWidth <= 0) return
-		val targetPx = BACKDROP_TARGET_BLUR_DP * resources.displayMetrics.density
-		val radius = (targetPx * drawableWidth / viewWidth).coerceIn(2f, 80f)
-		backdrop.setRenderEffect(
-			RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
+		backdrop.exactImageSize = CoilSize(BACKDROP_CANONICAL_WIDTH_PX, BACKDROP_CANONICAL_HEIGHT_PX)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			backdrop.setRenderEffect(
+				RenderEffect.createBlurEffect(
+					BACKDROP_BLUR_RADIUS_PX,
+					BACKDROP_BLUR_RADIUS_PX,
+					Shader.TileMode.CLAMP,
+				),
+			)
+		}
+		val scrim = MaterialColors.getColor(
+			viewBinding.backdropContainer,
+			com.google.android.material.R.attr.colorSurface,
+		)
+		viewBinding.backdropContainer.foreground = GradientDrawable(
+			GradientDrawable.Orientation.TOP_BOTTOM,
+			intArrayOf(
+				Color.TRANSPARENT,
+				Color.TRANSPARENT,
+				ColorUtils.setAlphaComponent(scrim, 0x80),
+				scrim,
+			),
 		)
 	}
 
@@ -652,11 +656,10 @@ class DetailsActivity :
 
 		private const val FAV_LABEL_LIMIT = 16
 
-		/**
-		 * Visual backdrop blur radius in dp, applied to the rendered view (not to source pixels).
-		 * [updateBackdropBlur] scales the real `RenderEffect` radius from this so the on-screen
-		 * blur is the same regardless of how big the underlying cover image is.
-		 */
-		private const val BACKDROP_TARGET_BLUR_DP = 8f
+		/** Canonical pixel size we sample backdrop covers down to so blur stays consistent. */
+		private const val BACKDROP_CANONICAL_WIDTH_PX = 256
+		private const val BACKDROP_CANONICAL_HEIGHT_PX = 144
+		/** RenderEffect radius in source pixels — large relative to the 256-px input. */
+		private const val BACKDROP_BLUR_RADIUS_PX = 16f
 	}
 }
