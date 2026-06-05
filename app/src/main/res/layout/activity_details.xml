@@ -259,11 +259,18 @@
 
 				<Button
 					android:id="@+id/button_description_more"
-					style="@style/Widget.Kotatsu.Button.More"
+					style="?attr/borderlessButtonStyle"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginEnd="8dp"
+					android:minWidth="0dp"
+					android:minHeight="0dp"
+					android:paddingHorizontal="6dp"
+					android:paddingVertical="2dp"
 					android:text="@string/more"
+					android:textAllCaps="false"
+					android:textAppearance="?attr/textAppearanceLabelMedium"
+					android:textColor="?colorPrimary"
 					app:layout_constraintBaseline_toBaselineOf="@id/textView_description_title"
 					app:layout_constraintEnd_toEndOf="parent" />
 
