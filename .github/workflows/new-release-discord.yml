@@ -2,7 +2,7 @@ name: Discord Release Webhook
 
 on:
   release:
-    types: [published]
+    types: [published, edited]
 
 jobs:
   releaseNotification:
