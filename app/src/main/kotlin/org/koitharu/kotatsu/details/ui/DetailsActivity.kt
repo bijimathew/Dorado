@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.annotation.AttrRes
 import androidx.core.text.buildSpannedString
 import androidx.core.text.inSpans
 import androidx.core.text.method.LinkMovementMethodCompat
@@ -54,6 +55,7 @@ import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
 import org.koitharu.kotatsu.core.model.getSummary
 import org.koitharu.kotatsu.core.model.getTitle
+import org.koitharu.kotatsu.core.model.iconResId
 import org.koitharu.kotatsu.core.model.titleResId
 import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.nav.router
@@ -165,7 +167,7 @@ class DetailsActivity :
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
 		viewBinding.textViewDescription.viewTreeObserver.addOnDrawListener(this)
-		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
+		viewBinding.textViewAuthorSub.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
 		setupBackdropChrome()
@@ -376,12 +378,10 @@ class DetailsActivity :
 
 	private fun onLocalSizeChanged(size: Long) {
 		if (size == 0L) {
-			infoBinding.textViewLocal.isVisible = false
-			infoBinding.textViewLocalLabel.isVisible = false
+			infoBinding.metaLocalRow.isVisible = false
 		} else {
 			infoBinding.textViewLocal.text = FileSize.BYTES.format(this, size)
-			infoBinding.textViewLocal.isVisible = true
-			infoBinding.textViewLocalLabel.isVisible = true
+			infoBinding.metaLocalRow.isVisible = true
 		}
 	}
 
@@ -442,22 +442,28 @@ class DetailsActivity :
 				TextDrawable.compound(infoBinding.textViewTranslation, it)
 			}
 			infoBinding.textViewTranslationLabel.isVisible = infoBinding.textViewTranslation.isVisible
-			textViewAuthor.textAndVisible = manga.getAuthorsString()
-			textViewAuthorLabel.isVisible = textViewAuthor.isVisible
+			viewBinding.textViewAuthorSub.textAndVisible = manga.getAuthorsString()
 			if (manga.hasRating) {
-				ratingBarRating.rating = manga.rating * ratingBarRating.numStars
-				ratingBarRating.isVisible = true
-				textViewRatingLabel.isVisible = true
+				val rating = manga.rating * viewBinding.ratingBarRating.numStars
+				viewBinding.ratingBarRating.rating = rating
+				viewBinding.ratingBarRating.isVisible = true
+				viewBinding.textViewRating.text = String.format(java.util.Locale.ROOT, "%.1f", rating)
+				viewBinding.textViewRating.isVisible = true
 			} else {
-				ratingBarRating.isVisible = false
-				textViewRatingLabel.isVisible = false
+				viewBinding.ratingBarRating.isVisible = false
+				viewBinding.textViewRating.isVisible = false
 			}
 			manga.state?.let { state ->
-				textViewState.textAndVisible = resources.getString(state.titleResId)
-				textViewStateLabel.isVisible = textViewState.isVisible
+				val chip = viewBinding.chipState
+				chip.text = resources.getString(state.titleResId)
+				chip.setChipIconResource(state.iconResId)
+				val container = MaterialColors.getColor(chip, stateTintAttr(state))
+				chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(
+					ColorUtils.setAlphaComponent(container, 0x66),
+				)
+				chip.isVisible = true
 			} ?: run {
-				textViewState.isVisible = false
-				textViewStateLabel.isVisible = false
+				viewBinding.chipState.isVisible = false
 			}
 
 			if (manga.source == LocalMangaSource || manga.source == UnknownMangaSource) {
@@ -511,19 +517,10 @@ class DetailsActivity :
 			else -> resources.getQuantityStringSafe(R.plurals.chapters, info.totalChapters, info.totalChapters)
 				.withEstimatedTime(info.estimatedTime)
 		}
-		textViewProgress.textAndVisible = if (info.percent <= 0f) {
-			null
-		} else {
-			val displayPercent = if (ReadingProgress.isCompleted(info.percent)) 100 else (info.percent * 100f).toInt()
-			getString(R.string.percent_string_pattern, displayPercent.toString())
-		}
-
 		progress.setProgressCompat(
 			(progress.max * info.percent.coerceIn(0f, 1f)).roundToInt(),
 			true,
 		)
-		textViewProgressLabel.isVisible = info.history != null
-		textViewProgress.isVisible = info.history != null
 		progress.isVisible = info.history != null
 	}
 
@@ -639,6 +636,16 @@ class DetailsActivity :
 				MangaPrefetchService.prefetchPages(context, item.chapter)
 			}
 		}
+	}
+
+	@AttrRes
+	private fun stateTintAttr(state: org.koitharu.kotatsu.parsers.model.MangaState): Int = when (state) {
+		org.koitharu.kotatsu.parsers.model.MangaState.ONGOING -> com.google.android.material.R.attr.colorTertiaryContainer
+		org.koitharu.kotatsu.parsers.model.MangaState.FINISHED -> com.google.android.material.R.attr.colorPrimaryContainer
+		org.koitharu.kotatsu.parsers.model.MangaState.ABANDONED,
+		org.koitharu.kotatsu.parsers.model.MangaState.PAUSED -> com.google.android.material.R.attr.colorErrorContainer
+		org.koitharu.kotatsu.parsers.model.MangaState.UPCOMING -> com.google.android.material.R.attr.colorSecondaryContainer
+		org.koitharu.kotatsu.parsers.model.MangaState.RESTRICTED -> com.google.android.material.R.attr.colorErrorContainer
 	}
 
 	companion object {
