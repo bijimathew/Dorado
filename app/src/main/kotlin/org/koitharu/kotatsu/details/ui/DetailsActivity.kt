@@ -14,7 +14,6 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.activity.viewModels
-import androidx.annotation.AttrRes
 import androidx.core.text.buildSpannedString
 import androidx.core.text.inSpans
 import androidx.core.text.method.LinkMovementMethodCompat
@@ -54,7 +53,6 @@ import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.UnknownMangaSource
 import org.koitharu.kotatsu.core.model.getSummary
 import org.koitharu.kotatsu.core.model.getTitle
-import org.koitharu.kotatsu.core.model.iconResId
 import org.koitharu.kotatsu.core.model.titleResId
 import org.koitharu.kotatsu.core.nav.ReaderIntent
 import org.koitharu.kotatsu.core.nav.router
@@ -82,6 +80,7 @@ import org.koitharu.kotatsu.core.util.ext.enqueueWith
 import org.koitharu.kotatsu.core.util.ext.getQuantityStringSafe
 import org.koitharu.kotatsu.core.util.ext.isAnimationsEnabled
 import org.koitharu.kotatsu.core.util.ext.isTextTruncated
+import org.koitharu.kotatsu.core.util.ext.joinToStringWithLimit
 import org.koitharu.kotatsu.core.util.ext.mangaSourceExtra
 import org.koitharu.kotatsu.core.util.ext.observe
 import org.koitharu.kotatsu.core.util.ext.observeEvent
@@ -152,6 +151,7 @@ class DetailsActivity :
 		infoBinding = LayoutDetailsTableBinding.bind(viewBinding.root)
 		setDisplayHomeAsUp(isEnabled = true, showUpAsClose = false)
 		supportActionBar?.setDisplayShowTitleEnabled(false)
+		viewBinding.chipFavorite.setOnClickListener(this)
 		infoBinding.textViewLocal.setOnClickListener(this)
 		infoBinding.textViewSource.setOnClickListener(this)
 		viewBinding.imageViewCover.setOnClickListener(this)
@@ -166,7 +166,7 @@ class DetailsActivity :
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
 		viewBinding.textViewDescription.viewTreeObserver.addOnDrawListener(this)
-		viewBinding.textViewAuthorSub.movementMethod = LinkMovementMethodCompat.getInstance()
+		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
 		setupBackdropChrome()
@@ -236,6 +236,11 @@ class DetailsActivity :
 			R.id.textView_local -> {
 				val manga = viewModel.getMangaOrNull() ?: return
 				router.showLocalInfoDialog(manga)
+			}
+
+			R.id.chip_favorite -> {
+				val manga = viewModel.getMangaOrNull() ?: return
+				router.showFavoriteDialog(manga)
 			}
 
 			R.id.imageView_cover -> {
@@ -373,6 +378,13 @@ class DetailsActivity :
 
 	private fun onFavoritesChanged(categories: Set<FavouriteCategory>) {
 		invalidateOptionsMenu()
+		val chip = viewBinding.chipFavorite
+		chip.setChipIconResource(if (categories.isEmpty()) R.drawable.ic_heart_outline else R.drawable.ic_heart)
+		chip.text = if (categories.isEmpty()) {
+			getString(R.string.add_to_favourites)
+		} else {
+			categories.joinToStringWithLimit(this, FAV_LABEL_LIMIT) { it.title }
+		}
 	}
 
 	private fun onLocalSizeChanged(size: Long) {
@@ -441,29 +453,29 @@ class DetailsActivity :
 				TextDrawable.compound(infoBinding.textViewTranslation, it)
 			}
 			infoBinding.textViewTranslationLabel.isVisible = infoBinding.textViewTranslation.isVisible
-			viewBinding.textViewAuthorSub.textAndVisible = manga.getAuthorsString()
+			textViewAuthor.textAndVisible = manga.getAuthorsString()
+			textViewAuthorLabel.isVisible = textViewAuthor.isVisible
+			metaAuthorRow.isVisible = textViewAuthor.isVisible
 			if (manga.hasRating) {
-				val rating = manga.rating * viewBinding.ratingBarRating.numStars
-				viewBinding.ratingBarRating.rating = rating
-				viewBinding.ratingBarRating.isVisible = true
-				viewBinding.textViewRating.text = String.format(java.util.Locale.ROOT, "%.1f", rating)
-				viewBinding.textViewRating.isVisible = true
+				ratingBarRating.rating = manga.rating * ratingBarRating.numStars
+				ratingBarRating.isVisible = true
+				textViewRatingLabel.isVisible = true
+				metaRatingCell.isVisible = true
 			} else {
-				viewBinding.ratingBarRating.isVisible = false
-				viewBinding.textViewRating.isVisible = false
+				ratingBarRating.isVisible = false
+				textViewRatingLabel.isVisible = false
+				metaRatingCell.isVisible = false
 			}
 			manga.state?.let { state ->
-				val chip = viewBinding.chipState
-				chip.text = resources.getString(state.titleResId)
-				chip.setChipIconResource(state.iconResId)
-				val container = MaterialColors.getColor(chip, stateTintAttr(state))
-				chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-					ColorUtils.setAlphaComponent(container, 0x66),
-				)
-				chip.isVisible = true
+				textViewState.textAndVisible = resources.getString(state.titleResId)
+				textViewStateLabel.isVisible = textViewState.isVisible
+				metaStateCell.isVisible = textViewState.isVisible
 			} ?: run {
-				viewBinding.chipState.isVisible = false
+				textViewState.isVisible = false
+				textViewStateLabel.isVisible = false
+				metaStateCell.isVisible = false
 			}
+			metaRatingStateRow.isVisible = metaRatingCell.isVisible || metaStateCell.isVisible
 
 			if (manga.source == LocalMangaSource || manga.source == UnknownMangaSource) {
 				textViewSource.isVisible = false
@@ -516,11 +528,19 @@ class DetailsActivity :
 			else -> resources.getQuantityStringSafe(R.plurals.chapters, info.totalChapters, info.totalChapters)
 				.withEstimatedTime(info.estimatedTime)
 		}
+		textViewProgress.textAndVisible = if (info.percent <= 0f) {
+			null
+		} else {
+			val displayPercent = if (ReadingProgress.isCompleted(info.percent)) 100 else (info.percent * 100f).toInt()
+			getString(R.string.percent_string_pattern, displayPercent.toString())
+		}
 		progress.setProgressCompat(
 			(progress.max * info.percent.coerceIn(0f, 1f)).roundToInt(),
 			true,
 		)
+		textViewProgressLabel.isVisible = info.history != null
 		progress.isVisible = info.history != null
+		metaProgressRow.isVisible = info.history != null
 	}
 
 	private fun onTagsChanged(tags: Collection<ChipsView.ChipModel>) {
@@ -634,17 +654,9 @@ class DetailsActivity :
 		}
 	}
 
-	@AttrRes
-	private fun stateTintAttr(state: org.koitharu.kotatsu.parsers.model.MangaState): Int = when (state) {
-		org.koitharu.kotatsu.parsers.model.MangaState.ONGOING -> com.google.android.material.R.attr.colorTertiaryContainer
-		org.koitharu.kotatsu.parsers.model.MangaState.FINISHED -> com.google.android.material.R.attr.colorPrimaryContainer
-		org.koitharu.kotatsu.parsers.model.MangaState.ABANDONED,
-		org.koitharu.kotatsu.parsers.model.MangaState.PAUSED -> com.google.android.material.R.attr.colorErrorContainer
-		org.koitharu.kotatsu.parsers.model.MangaState.UPCOMING -> com.google.android.material.R.attr.colorSecondaryContainer
-		org.koitharu.kotatsu.parsers.model.MangaState.RESTRICTED -> com.google.android.material.R.attr.colorErrorContainer
-	}
-
 	companion object {
+
+		private const val FAV_LABEL_LIMIT = 16
 
 		/** Canonical pixel size we sample backdrop covers down to so blur stays consistent. */
 		private const val BACKDROP_CANONICAL_WIDTH_PX = 256

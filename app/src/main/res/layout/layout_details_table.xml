@@ -14,7 +14,7 @@
 		android:orientation="vertical"
 		app:layout_constraintEnd_toEndOf="parent"
 		app:layout_constraintStart_toStartOf="parent"
-		app:layout_constraintTop_toBottomOf="@id/status_strip">
+		app:layout_constraintTop_toBottomOf="@id/barrier_header">
 
 		<!-- Row 1: Source | Translation -->
 		<LinearLayout
@@ -110,7 +110,142 @@
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 2: Chapters with inline progress -->
+		<!-- Row 2: Author (full width) -->
+		<LinearLayout
+			android:id="@+id/meta_author_row"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:paddingVertical="10dp">
+
+			<ImageView
+				android:layout_width="16dp"
+				android:layout_height="16dp"
+				android:contentDescription="@null"
+				android:src="@drawable/ic_user"
+				app:tint="?colorPrimary" />
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="10dp"
+				android:layout_weight="1"
+				android:orientation="vertical">
+
+				<TextView
+					android:id="@+id/textView_author_label"
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:letterSpacing="0.08"
+					android:singleLine="true"
+					android:text="@string/author"
+					android:textAppearance="?textAppearanceLabelSmall"
+					android:textColor="?android:textColorSecondary" />
+
+				<TextView
+					android:id="@+id/textView_author"
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:textAppearance="?textAppearanceBodyMedium"
+					tools:text="Author name" />
+			</LinearLayout>
+		</LinearLayout>
+
+		<!-- Row 3: Rating | State -->
+		<LinearLayout
+			android:id="@+id/meta_rating_state_row"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:paddingVertical="10dp">
+
+			<LinearLayout
+				android:id="@+id/meta_rating_cell"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<ImageView
+					android:layout_width="16dp"
+					android:layout_height="16dp"
+					android:contentDescription="@null"
+					android:src="@drawable/ic_star_small"
+					app:tint="?colorPrimary" />
+
+				<LinearLayout
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:id="@+id/textView_rating_label"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:letterSpacing="0.08"
+						android:singleLine="true"
+						android:text="@string/rating"
+						android:textAppearance="?textAppearanceLabelSmall"
+						android:textColor="?android:textColorSecondary" />
+
+					<RatingBar
+						android:id="@+id/ratingBar_rating"
+						style="?ratingBarStyleSmall"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:isIndicator="true"
+						android:numStars="5"
+						android:stepSize="0.5" />
+				</LinearLayout>
+			</LinearLayout>
+
+			<LinearLayout
+				android:id="@+id/meta_state_cell"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<ImageView
+					android:layout_width="16dp"
+					android:layout_height="16dp"
+					android:contentDescription="@null"
+					android:src="@drawable/ic_play"
+					app:tint="?colorPrimary" />
+
+				<LinearLayout
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:id="@+id/textView_state_label"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:letterSpacing="0.08"
+						android:singleLine="true"
+						android:text="@string/state"
+						android:textAppearance="?textAppearanceLabelSmall"
+						android:textColor="?android:textColorSecondary" />
+
+					<TextView
+						android:id="@+id/textView_state"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:singleLine="true"
+						android:textAppearance="?textAppearanceBodyMedium"
+						tools:text="Ongoing" />
+				</LinearLayout>
+			</LinearLayout>
+		</LinearLayout>
+
+		<!-- Row 4: Chapters -->
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
@@ -120,7 +255,6 @@
 			<ImageView
 				android:layout_width="16dp"
 				android:layout_height="16dp"
-				android:layout_marginTop="2dp"
 				android:contentDescription="@null"
 				android:src="@drawable/ic_book_page"
 				app:tint="?colorPrimary" />
@@ -149,21 +283,10 @@
 					android:singleLine="true"
 					android:textAppearance="?textAppearanceBodyMedium"
 					tools:text="42 of 256" />
-
-				<com.google.android.material.progressindicator.LinearProgressIndicator
-					android:id="@+id/progress"
-					style="?linearProgressIndicatorStyle"
-					android:layout_width="match_parent"
-					android:layout_height="wrap_content"
-					android:layout_marginTop="4dp"
-					android:indeterminate="false"
-					android:max="100"
-					app:trackColor="?android:colorBackground"
-					tools:progress="12" />
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 3: On device (toggled in code) -->
+		<!-- Row 5: On device (toggled in code) -->
 		<LinearLayout
 			android:id="@+id/meta_local_row"
 			android:layout_width="match_parent"
@@ -205,6 +328,68 @@
 					android:singleLine="true"
 					android:textAppearance="?textAppearanceBodyMedium"
 					tools:text="25 Mb" />
+			</LinearLayout>
+		</LinearLayout>
+
+		<!-- Row 6: Progress -->
+		<LinearLayout
+			android:id="@+id/meta_progress_row"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal"
+			android:paddingVertical="10dp">
+
+			<ImageView
+				android:layout_width="16dp"
+				android:layout_height="16dp"
+				android:layout_marginTop="2dp"
+				android:contentDescription="@null"
+				android:src="@drawable/ic_history"
+				app:tint="?colorPrimary" />
+
+			<LinearLayout
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="10dp"
+				android:layout_weight="1"
+				android:orientation="vertical">
+
+				<TextView
+					android:id="@+id/textView_progress_label"
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:letterSpacing="0.08"
+					android:singleLine="true"
+					android:text="@string/progress"
+					android:textAppearance="?textAppearanceLabelSmall"
+					android:textColor="?android:textColorSecondary" />
+
+				<LinearLayout
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:gravity="center_vertical"
+					android:orientation="horizontal">
+
+					<com.google.android.material.progressindicator.LinearProgressIndicator
+						android:id="@+id/progress"
+						style="?linearProgressIndicatorStyle"
+						android:layout_width="0dp"
+						android:layout_height="wrap_content"
+						android:layout_weight="1"
+						android:indeterminate="false"
+						android:max="100"
+						app:trackColor="?android:colorBackground"
+						tools:progress="49" />
+
+					<TextView
+						android:id="@+id/textView_progress"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:layout_marginStart="8dp"
+						android:singleLine="true"
+						android:textAppearance="?textAppearanceLabelMedium"
+						tools:text="49%" />
+				</LinearLayout>
 			</LinearLayout>
 		</LinearLayout>
 
