@@ -2,7 +2,6 @@ package org.koitharu.kotatsu.details.ui
 
 import android.app.assist.AssistContent
 import android.content.Context
-import android.graphics.Color
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
@@ -576,9 +575,13 @@ class DetailsActivity :
 		viewBinding.backdropScrim.background = GradientDrawable(
 			GradientDrawable.Orientation.TOP_BOTTOM,
 			intArrayOf(
-				Color.TRANSPARENT,
-				Color.TRANSPARENT,
-				ColorUtils.setAlphaComponent(surface, 0xE0),
+				// Theme-adaptive surface wash across the whole content area so
+				// title + meta-table text stays readable on top of vivid covers.
+				// Stays smooth (no hard edges) and adapts: in dark theme the
+				// wash is dark-on-bright, in light theme light-on-dark.
+				ColorUtils.setAlphaComponent(surface, 0x80),
+				ColorUtils.setAlphaComponent(surface, 0x80),
+				ColorUtils.setAlphaComponent(surface, 0xB0),
 				surface,
 			),
 		)
