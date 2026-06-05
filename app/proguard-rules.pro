@@ -123,3 +123,22 @@
 -keep class kotlinx.coroutines.** { *; }
 -keeppackagenames kotlinx.coroutines.**
 -dontwarn kotlinx.coroutines.**
+
+# kaisoku-parsers public API.
+# Plugin parsers (and reflection-discovered built-in parsers) call into the parsers
+# public API through abstract/interface types. R8 has no static view of those calls
+# and aggressively shrinks the ABI — that's what stripped MangaLoaderContext methods
+# (including getDefaultUserAgent) in v9.7.7-2, causing #2/#3 to crash on every parser
+# construction. Keep the whole surface so dynamic dispatch resolves correctly.
+-keep public class org.koitharu.kotatsu.parsers.MangaLoaderContext { *; }
+-keep public interface org.koitharu.kotatsu.parsers.MangaParser { *; }
+-keep public interface org.koitharu.kotatsu.parsers.MangaParserAuthProvider { *; }
+-keep public class org.koitharu.kotatsu.parsers.core.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.model.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.config.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.network.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.exception.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.webview.** { public protected *; }
+-keep public class org.koitharu.kotatsu.parsers.util.** { public protected *; }
+-keep,allowobfuscation @org.koitharu.kotatsu.parsers.MangaSourceParser class * { *; }
+-keep,allowobfuscation @org.koitharu.kotatsu.parsers.InternalParsersApi class * { *; }
