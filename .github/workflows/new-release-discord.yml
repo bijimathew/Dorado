@@ -20,11 +20,18 @@ jobs:
           ACTOR: ${{ github.actor }}
           TIMESTAMP: ${{ github.event.release.published_at }}
         run: |
+          # Discord caps embed description at 4096 chars; release notes can grow past that.
+          DESC="${BODY}"
+          if [ ${#DESC} -gt 3800 ]; then
+            DESC="${DESC:0:3800}
+
+…(truncated; open the release for full notes)"
+          fi
           jq -n \
             --arg content "<@&1506992583744684175>" \
             --arg title "🚀 New Release: ${REPO} v${TAG}" \
             --arg url "${URL}" \
-            --arg description "${BODY}" \
+            --arg description "${DESC}" \
             --arg author_name "${ACTOR}" \
             --arg author_icon "https://github.com/${ACTOR}.png" \
             --arg footer "Release published on main" \
@@ -58,10 +65,16 @@ jobs:
           ACTOR: ${{ github.actor }}
           TIMESTAMP: ${{ github.event.release.published_at }}
         run: |
+          DESC="${BODY}"
+          if [ ${#DESC} -gt 3800 ]; then
+            DESC="${DESC:0:3800}
+
+…(truncated; open the release for full notes)"
+          fi
           jq -n \
             --arg title "🧪 Pre-Release: ${REPO} ${TAG}" \
             --arg url "${URL}" \
-            --arg description "${BODY}" \
+            --arg description "${DESC}" \
             --arg author_name "${ACTOR}" \
             --arg author_icon "https://github.com/${ACTOR}.png" \
             --arg footer "Pre-release build" \
