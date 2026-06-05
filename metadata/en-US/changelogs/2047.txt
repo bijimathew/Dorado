@@ -1,0 +1,5 @@
+- Fix: release builds crashed when opening any source ("NoSuchMethodError: getDefaultUserAgent"). Affected 9.7.7-1 and 9.7.7-2.
+- Fix: crash reports filed from the in-app dialog now render with proper headings on GitHub instead of tab-indented garbage.
+- Comix: scrambled webtoon pages (e.g. Black Killer Whale Baby) now load correctly — routed through the CDN's pre-descrambled tier.
+- Comix: chapter list + page list re-built on the new WebView API bridge after the site moved its signer to an obfuscated VM.
+- Details screen: full-bleed blurred backdrop, 2-column meta grid, toolbar favourite action.
