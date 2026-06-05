@@ -545,7 +545,9 @@ class DetailsActivity :
 
 	private fun loadBackdrop(imageUrl: String?) {
 		val isVisible = !imageUrl.isNullOrBlank()
-		viewBinding.backdropContainer.isVisible = isVisible
+		viewBinding.backdrop.isVisible = isVisible
+		viewBinding.backdropScrim.isVisible = isVisible
+		viewBinding.backdropClickArea.isVisible = isVisible
 		viewBinding.backdrop.setImageAsync(imageUrl, viewModel.getMangaOrNull())
 	}
 
@@ -570,17 +572,17 @@ class DetailsActivity :
 				),
 			)
 		}
-		val scrim = MaterialColors.getColor(
-			viewBinding.backdropContainer,
+		val surface = MaterialColors.getColor(
+			viewBinding.backdropScrim,
 			com.google.android.material.R.attr.colorSurface,
 		)
-		viewBinding.backdropContainer.foreground = GradientDrawable(
+		viewBinding.backdropScrim.background = GradientDrawable(
 			GradientDrawable.Orientation.TOP_BOTTOM,
 			intArrayOf(
 				Color.TRANSPARENT,
 				Color.TRANSPARENT,
-				ColorUtils.setAlphaComponent(scrim, 0x80),
-				scrim,
+				ColorUtils.setAlphaComponent(surface, 0xE0),
+				surface,
 			),
 		)
 	}

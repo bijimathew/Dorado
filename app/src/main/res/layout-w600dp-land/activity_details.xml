@@ -59,23 +59,26 @@
 					android:layout_width="0dp"
 					android:layout_height="180dp"
 					android:background="?colorSurfaceContainer"
-					android:visibility="gone"
 					app:layout_constraintEnd_toEndOf="parent"
 					app:layout_constraintStart_toStartOf="parent"
-					app:layout_constraintTop_toTopOf="parent"
-					tools:visibility="visible">
+					app:layout_constraintTop_toTopOf="parent">
 
 					<org.koitharu.kotatsu.image.ui.CoverImageView
 						android:id="@+id/backdrop"
 						android:layout_width="match_parent"
 						android:layout_height="match_parent"
-						android:alpha="0.32"
 						android:contentDescription="@null"
 						android:scaleType="centerCrop"
 						app:allowRgb565="true"
 						app:useExistingDrawable="true"
 						tools:background="@tools:sample/backgrounds/scenic[6]"
 						tools:ignore="UnusedAttribute" />
+
+					<View
+						android:id="@+id/backdrop_scrim"
+						android:layout_width="match_parent"
+						android:layout_height="match_parent"
+						android:importantForAccessibility="no" />
 
 					<View
 						android:id="@+id/backdrop_click_area"

@@ -11,6 +11,30 @@
 	tools:viewBindingType="android.view.ViewGroup">
 
 	<org.koitharu.kotatsu.image.ui.CoverImageView
+		android:id="@+id/backdrop"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:contentDescription="@null"
+		android:scaleType="centerCrop"
+		app:allowRgb565="true"
+		app:useExistingDrawable="true"
+		tools:background="@tools:sample/backgrounds/scenic[6]"
+		tools:ignore="UnusedAttribute,ContentDescription" />
+
+	<View
+		android:id="@+id/backdrop_scrim"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:importantForAccessibility="no" />
+
+	<View
+		android:id="@+id/backdrop_click_area"
+		android:layout_width="match_parent"
+		android:layout_height="220dp"
+		android:layout_gravity="top"
+		android:background="?attr/selectableItemBackgroundBorderless" />
+
+	<org.koitharu.kotatsu.image.ui.CoverImageView
 		android:id="@+id/imageView_cover_bg"
 		android:layout_width="match_parent"
 		android:layout_height="420dp"
@@ -58,37 +82,6 @@
 				android:layout_width="match_parent"
 				android:layout_height="match_parent"
 				android:paddingBottom="@dimen/margin_normal">
-
-				<FrameLayout
-					android:id="@+id/backdrop_container"
-					android:layout_width="0dp"
-					android:layout_height="220dp"
-					android:background="?colorSurfaceContainer"
-					android:visibility="gone"
-					app:layout_constraintEnd_toEndOf="parent"
-					app:layout_constraintStart_toStartOf="parent"
-					app:layout_constraintTop_toTopOf="parent"
-					tools:visibility="visible">
-
-					<org.koitharu.kotatsu.image.ui.CoverImageView
-						android:id="@+id/backdrop"
-						android:layout_width="match_parent"
-						android:layout_height="match_parent"
-						android:alpha="0.32"
-						android:contentDescription="@null"
-						android:scaleType="centerCrop"
-						app:allowRgb565="true"
-						app:useExistingDrawable="true"
-						tools:background="@tools:sample/backgrounds/scenic[6]"
-						tools:ignore="UnusedAttribute" />
-
-					<View
-						android:id="@+id/backdrop_click_area"
-						android:layout_width="match_parent"
-						android:layout_height="match_parent"
-						android:background="?attr/selectableItemBackgroundBorderless" />
-
-				</FrameLayout>
 
 				<org.koitharu.kotatsu.image.ui.CoverImageView
 					android:id="@+id/imageView_cover"
