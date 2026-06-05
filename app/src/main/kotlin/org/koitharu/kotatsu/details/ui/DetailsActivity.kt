@@ -389,11 +389,13 @@ class DetailsActivity :
 
 	private fun onLocalSizeChanged(size: Long) {
 		if (size == 0L) {
-			infoBinding.metaLocalRow.isVisible = false
+			infoBinding.metaLocalCell.isVisible = false
 		} else {
 			infoBinding.textViewLocal.text = FileSize.BYTES.format(this, size)
-			infoBinding.metaLocalRow.isVisible = true
+			infoBinding.metaLocalCell.isVisible = true
 		}
+		infoBinding.metaRatingLocalRow.isVisible =
+			infoBinding.metaRatingCell.isVisible || infoBinding.metaLocalCell.isVisible
 	}
 
 	private fun onRelatedMangaChanged(related: List<MangaListModel>) {
@@ -455,7 +457,17 @@ class DetailsActivity :
 			infoBinding.textViewTranslationLabel.isVisible = infoBinding.textViewTranslation.isVisible
 			textViewAuthor.textAndVisible = manga.getAuthorsString()
 			textViewAuthorLabel.isVisible = textViewAuthor.isVisible
-			metaAuthorRow.isVisible = textViewAuthor.isVisible
+			metaAuthorCell.isVisible = textViewAuthor.isVisible
+			manga.state?.let { state ->
+				textViewState.textAndVisible = resources.getString(state.titleResId)
+				textViewStateLabel.isVisible = textViewState.isVisible
+				metaStateCell.isVisible = textViewState.isVisible
+			} ?: run {
+				textViewState.isVisible = false
+				textViewStateLabel.isVisible = false
+				metaStateCell.isVisible = false
+			}
+			metaAuthorStateRow.isVisible = metaAuthorCell.isVisible || metaStateCell.isVisible
 			if (manga.hasRating) {
 				ratingBarRating.rating = manga.rating * ratingBarRating.numStars
 				ratingBarRating.isVisible = true
@@ -466,16 +478,7 @@ class DetailsActivity :
 				textViewRatingLabel.isVisible = false
 				metaRatingCell.isVisible = false
 			}
-			manga.state?.let { state ->
-				textViewState.textAndVisible = resources.getString(state.titleResId)
-				textViewStateLabel.isVisible = textViewState.isVisible
-				metaStateCell.isVisible = textViewState.isVisible
-			} ?: run {
-				textViewState.isVisible = false
-				textViewStateLabel.isVisible = false
-				metaStateCell.isVisible = false
-			}
-			metaRatingStateRow.isVisible = metaRatingCell.isVisible || metaStateCell.isVisible
+			metaRatingLocalRow.isVisible = metaRatingCell.isVisible || metaLocalCell.isVisible
 
 			if (manga.source == LocalMangaSource || manga.source == UnknownMangaSource) {
 				textViewSource.isVisible = false

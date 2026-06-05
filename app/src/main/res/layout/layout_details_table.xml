@@ -20,6 +20,7 @@
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
+			android:baselineAligned="false"
 			android:orientation="horizontal"
 			android:paddingVertical="10dp">
 
@@ -110,52 +111,107 @@
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 2: Author (full width) -->
+		<!-- Row 2: Author | State -->
 		<LinearLayout
-			android:id="@+id/meta_author_row"
+			android:id="@+id/meta_author_state_row"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
+			android:baselineAligned="false"
 			android:orientation="horizontal"
 			android:paddingVertical="10dp">
 
-			<ImageView
-				android:layout_width="16dp"
-				android:layout_height="16dp"
-				android:contentDescription="@null"
-				android:src="@drawable/ic_user"
-				app:tint="?colorPrimary" />
-
 			<LinearLayout
+				android:id="@+id/meta_author_cell"
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
 				android:layout_weight="1"
-				android:orientation="vertical">
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
 
-				<TextView
-					android:id="@+id/textView_author_label"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:letterSpacing="0.08"
-					android:singleLine="true"
-					android:text="@string/author"
-					android:textAppearance="?textAppearanceLabelSmall"
-					android:textColor="?android:textColorSecondary" />
+				<ImageView
+					android:layout_width="16dp"
+					android:layout_height="16dp"
+					android:contentDescription="@null"
+					android:src="@drawable/ic_user"
+					app:tint="?colorPrimary" />
 
-				<TextView
-					android:id="@+id/textView_author"
-					android:layout_width="wrap_content"
+				<LinearLayout
+					android:layout_width="0dp"
 					android:layout_height="wrap_content"
-					android:textAppearance="?textAppearanceBodyMedium"
-					tools:text="Author name" />
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:id="@+id/textView_author_label"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:letterSpacing="0.08"
+						android:singleLine="true"
+						android:text="@string/author"
+						android:textAppearance="?textAppearanceLabelSmall"
+						android:textColor="?android:textColorSecondary" />
+
+					<TextView
+						android:id="@+id/textView_author"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:ellipsize="end"
+						android:maxLines="2"
+						android:textAppearance="?textAppearanceBodyMedium"
+						tools:text="Author name" />
+				</LinearLayout>
+			</LinearLayout>
+
+			<LinearLayout
+				android:id="@+id/meta_state_cell"
+				android:layout_width="0dp"
+				android:layout_height="wrap_content"
+				android:layout_weight="1"
+				android:gravity="center_vertical"
+				android:orientation="horizontal">
+
+				<ImageView
+					android:layout_width="16dp"
+					android:layout_height="16dp"
+					android:contentDescription="@null"
+					android:src="@drawable/ic_play"
+					app:tint="?colorPrimary" />
+
+				<LinearLayout
+					android:layout_width="0dp"
+					android:layout_height="wrap_content"
+					android:layout_marginStart="10dp"
+					android:layout_weight="1"
+					android:orientation="vertical">
+
+					<TextView
+						android:id="@+id/textView_state_label"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:letterSpacing="0.08"
+						android:singleLine="true"
+						android:text="@string/state"
+						android:textAppearance="?textAppearanceLabelSmall"
+						android:textColor="?android:textColorSecondary" />
+
+					<TextView
+						android:id="@+id/textView_state"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:singleLine="true"
+						android:textAppearance="?textAppearanceBodyMedium"
+						tools:text="Ongoing" />
+				</LinearLayout>
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 3: Rating | State -->
+		<!-- Row 3: Rating | On device -->
 		<LinearLayout
-			android:id="@+id/meta_rating_state_row"
+			android:id="@+id/meta_rating_local_row"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
+			android:baselineAligned="false"
 			android:orientation="horizontal"
 			android:paddingVertical="10dp">
 
@@ -203,18 +259,20 @@
 			</LinearLayout>
 
 			<LinearLayout
-				android:id="@+id/meta_state_cell"
+				android:id="@+id/meta_local_cell"
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
 				android:layout_weight="1"
 				android:gravity="center_vertical"
-				android:orientation="horizontal">
+				android:orientation="horizontal"
+				android:visibility="gone"
+				tools:visibility="visible">
 
 				<ImageView
 					android:layout_width="16dp"
 					android:layout_height="16dp"
 					android:contentDescription="@null"
-					android:src="@drawable/ic_play"
+					android:src="@drawable/ic_storage"
 					app:tint="?colorPrimary" />
 
 				<LinearLayout
@@ -225,27 +283,28 @@
 					android:orientation="vertical">
 
 					<TextView
-						android:id="@+id/textView_state_label"
+						android:id="@+id/textView_local_label"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
 						android:letterSpacing="0.08"
 						android:singleLine="true"
-						android:text="@string/state"
+						android:text="@string/on_device"
 						android:textAppearance="?textAppearanceLabelSmall"
 						android:textColor="?android:textColorSecondary" />
 
 					<TextView
-						android:id="@+id/textView_state"
+						android:id="@+id/textView_local"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
+						android:background="@drawable/custom_selectable_item_background"
 						android:singleLine="true"
 						android:textAppearance="?textAppearanceBodyMedium"
-						tools:text="Ongoing" />
+						tools:text="25 Mb" />
 				</LinearLayout>
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 4: Chapters -->
+		<!-- Row 4: Chapters (full width) -->
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
@@ -286,52 +345,7 @@
 			</LinearLayout>
 		</LinearLayout>
 
-		<!-- Row 5: On device (toggled in code) -->
-		<LinearLayout
-			android:id="@+id/meta_local_row"
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content"
-			android:orientation="horizontal"
-			android:paddingVertical="10dp"
-			android:visibility="gone"
-			tools:visibility="visible">
-
-			<ImageView
-				android:layout_width="16dp"
-				android:layout_height="16dp"
-				android:contentDescription="@null"
-				android:src="@drawable/ic_storage"
-				app:tint="?colorPrimary" />
-
-			<LinearLayout
-				android:layout_width="0dp"
-				android:layout_height="wrap_content"
-				android:layout_marginStart="10dp"
-				android:layout_weight="1"
-				android:orientation="vertical">
-
-				<TextView
-					android:id="@+id/textView_local_label"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:letterSpacing="0.08"
-					android:singleLine="true"
-					android:text="@string/on_device"
-					android:textAppearance="?textAppearanceLabelSmall"
-					android:textColor="?android:textColorSecondary" />
-
-				<TextView
-					android:id="@+id/textView_local"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:background="@drawable/custom_selectable_item_background"
-					android:singleLine="true"
-					android:textAppearance="?textAppearanceBodyMedium"
-					tools:text="25 Mb" />
-			</LinearLayout>
-		</LinearLayout>
-
-		<!-- Row 6: Progress -->
+		<!-- Row 5: Progress (full width with bar) -->
 		<LinearLayout
 			android:id="@+id/meta_progress_row"
 			android:layout_width="match_parent"
