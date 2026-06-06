@@ -12,7 +12,9 @@ import org.koitharu.kotatsu.core.parser.MangaRepository
 import org.koitharu.kotatsu.core.util.MultiMutex
 import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.toInstantOrNull
+import org.koitharu.kotatsu.core.model.MangaHistory
 import org.koitharu.kotatsu.history.data.HistoryRepository
+import org.koitharu.kotatsu.list.domain.ReadingProgress
 import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
@@ -22,6 +24,7 @@ import org.koitharu.kotatsu.tracker.domain.model.MangaTracking
 import org.koitharu.kotatsu.tracker.domain.model.MangaUpdates
 import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -87,7 +90,19 @@ class CheckNewChaptersUseCase @Inject constructor(
 		val history = historyRepository.getOne(track.manga)
 		val historyChapterId = history?.chapterId ?: 0L
 		val branch = getBranch(details, track.lastChapterId, historyChapterId)
-		compare(track, details, branch, historyChapterId, history?.chaptersCount ?: 0)
+		val updates = compare(track, details, branch, historyChapterId, history?.chaptersCount ?: 0)
+		// Post-filter: drop chapters the user has already read via a parallel import of the same
+		// series, and drop very old chapters that are likely catalogue noise rather than real
+		// releases. Cheap to skip when there's nothing to filter.
+		if (updates.isValid && updates.newChapters.isNotEmpty()) {
+			updates.filterReadAndStaleChapters(
+				chapters = details.getChapters(branch).orEmpty(),
+				history = history,
+				similarHistories = historyRepository.findSimilarByTitle(details, SIMILAR_HISTORY_LIMIT),
+			)
+		} else {
+			updates
+		}
 	}.getOrElse { error ->
 		MangaUpdates.Failure(
 			manga = track.manga,
@@ -247,9 +262,56 @@ class CheckNewChaptersUseCase @Inject constructor(
 		}
 	}
 
+	private fun MangaUpdates.Success.filterReadAndStaleChapters(
+		chapters: List<MangaChapter>,
+		history: MangaHistory?,
+		similarHistories: List<MangaHistory>,
+	): MangaUpdates.Success {
+		val readChapters = maxOf(
+			history.getReadChaptersCount(chapters),
+			similarHistories.maxOfOrNull { it.estimatedReadChaptersCount() } ?: 0,
+		)
+		val minChapterDate = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(MAX_STALE_CHAPTER_DAYS)
+		val filtered = newChapters.filter { chapter ->
+			chapter.isAfterReadPosition(chapters, readChapters) && chapter.isRecentEnough(minChapterDate)
+		}
+		return if (filtered.size == newChapters.size) this else copy(newChapters = filtered)
+	}
+
+	private fun MangaChapter.isAfterReadPosition(chapters: List<MangaChapter>, readChapters: Int): Boolean {
+		if (readChapters <= 0) return true
+		val index = chapters.indexOfFirst { it.id == id }
+		return index < 0 || index >= readChapters
+	}
+
+	private fun MangaChapter.isRecentEnough(minChapterDate: Long): Boolean {
+		return uploadDate == 0L || uploadDate >= minChapterDate
+	}
+
+	private fun MangaHistory?.getReadChaptersCount(chapters: List<MangaChapter>): Int {
+		if (this == null) return 0
+		val index = chapters.indexOfFirst { it.id == chapterId }
+		return when {
+			index >= 0 -> index + 1
+			ReadingProgress.isCompleted(percent) -> chapters.size
+			else -> estimatedReadChaptersCount().coerceAtMost(chapters.size)
+		}
+	}
+
+	private fun MangaHistory.estimatedReadChaptersCount(): Int {
+		if (chaptersCount <= 0) return 0
+		return if (ReadingProgress.isCompleted(percent)) {
+			chaptersCount
+		} else {
+			(percent * chaptersCount).toInt().coerceIn(0, chaptersCount)
+		}
+	}
+
 	private companion object {
 		const val TRANSIENT_RETRY_ATTEMPTS = 3
 		const val TRANSIENT_RETRY_INITIAL_DELAY_MS = 1_000L
 		const val TRANSIENT_RETRY_MAX_DELAY_MS = 4_000L
+		const val SIMILAR_HISTORY_LIMIT = 8
+		const val MAX_STALE_CHAPTER_DAYS = 90L
 	}
 }

@@ -59,23 +59,26 @@
 					android:layout_width="0dp"
 					android:layout_height="180dp"
 					android:background="?colorSurfaceContainer"
-					android:visibility="gone"
 					app:layout_constraintEnd_toEndOf="parent"
 					app:layout_constraintStart_toStartOf="parent"
-					app:layout_constraintTop_toTopOf="parent"
-					tools:visibility="visible">
+					app:layout_constraintTop_toTopOf="parent">
 
 					<org.koitharu.kotatsu.image.ui.CoverImageView
 						android:id="@+id/backdrop"
 						android:layout_width="match_parent"
 						android:layout_height="match_parent"
-						android:alpha="0.32"
 						android:contentDescription="@null"
 						android:scaleType="centerCrop"
 						app:allowRgb565="true"
 						app:useExistingDrawable="true"
 						tools:background="@tools:sample/backgrounds/scenic[6]"
 						tools:ignore="UnusedAttribute" />
+
+					<View
+						android:id="@+id/backdrop_scrim"
+						android:layout_width="match_parent"
+						android:layout_height="match_parent"
+						android:importantForAccessibility="no" />
 
 					<View
 						android:id="@+id/backdrop_click_area"
@@ -165,7 +168,6 @@
 					app:layout_constraintStart_toEndOf="@id/imageView_cover"
 					app:layout_constraintTop_toBottomOf="@id/textView_title"
 					tools:text="@tools:sample/lorem[12]" />
-
 				<com.google.android.material.chip.Chip
 					android:id="@+id/chip_favorite"
 					style="@style/Widget.Kotatsu.Chip.Dropdown"
@@ -185,7 +187,6 @@
 					app:barrierDirection="bottom"
 					app:barrierMargin="@dimen/margin_normal"
 					app:constraint_referenced_ids="imageView_cover,chip_favorite" />
-
 				<include layout="@layout/layout_details_table" />
 
 				<TextView
@@ -201,15 +202,22 @@
 					android:textAppearance="?textAppearanceTitleSmall"
 					app:layout_constraintEnd_toStartOf="@id/button_description_more"
 					app:layout_constraintStart_toStartOf="parent"
-					app:layout_constraintTop_toBottomOf="@id/textView_progress_label" />
+					app:layout_constraintTop_toBottomOf="@id/meta_table" />
 
 				<Button
 					android:id="@+id/button_description_more"
-					style="@style/Widget.Kotatsu.Button.More"
+					style="?attr/borderlessButtonStyle"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginEnd="8dp"
+					android:minWidth="0dp"
+					android:minHeight="0dp"
+					android:paddingHorizontal="6dp"
+					android:paddingVertical="2dp"
 					android:text="@string/more"
+					android:textAllCaps="false"
+					android:textAppearance="?attr/textAppearanceLabelMedium"
+					android:textColor="?colorPrimary"
 					app:layout_constraintBaseline_toBaselineOf="@id/textView_description_title"
 					app:layout_constraintEnd_toEndOf="parent" />
 

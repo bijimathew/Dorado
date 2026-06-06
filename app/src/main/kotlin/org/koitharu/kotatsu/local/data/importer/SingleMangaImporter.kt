@@ -1,7 +1,12 @@
 package org.koitharu.kotatsu.local.data.importer
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import androidx.core.graphics.createBitmap
 import androidx.documentfile.provider.DocumentFile
 import dagger.Reusable
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,8 +22,10 @@ import org.koitharu.kotatsu.core.util.ext.resolveName
 import org.koitharu.kotatsu.core.util.ext.writeAllCancellable
 import org.koitharu.kotatsu.local.data.LocalStorageChanges
 import org.koitharu.kotatsu.local.data.LocalStorageManager
+import org.koitharu.kotatsu.local.data.hasPdfExtension
 import org.koitharu.kotatsu.local.data.hasZipExtension
 import org.koitharu.kotatsu.local.data.input.LocalMangaParser
+import org.koitharu.kotatsu.local.data.isPdfUri
 import org.koitharu.kotatsu.local.domain.model.LocalManga
 import java.io.File
 import java.io.IOException
@@ -34,7 +41,7 @@ class SingleMangaImporter @Inject constructor(
 	private val contentResolver = context.contentResolver
 
 	suspend fun import(uri: Uri): LocalManga {
-		val result = if (isDirectory(uri)) {
+		val result = if (isDirectory(uri) || isPdfUri(contentResolver, uri)) {
 			importDirectory(uri)
 		} else {
 			importFile(uri)
@@ -57,20 +64,58 @@ class SingleMangaImporter @Inject constructor(
 				output.writeAllCancellable(source)
 			}
 		}
-		LocalMangaParser(dest).getManga(withDetails = false)
+		parseManga(dest)
 	}
 
-	private suspend fun importDirectory(uri: Uri): LocalManga {
-		val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
-			"Provided uri $uri is not a tree"
+	private suspend fun importDirectory(uri: Uri): LocalManga = withContext(Dispatchers.IO) {
+		val name = contentResolver.resolveName(uri) ?: throw IOException("Cannot fetch name from uri: $uri")
+		val dest = when {
+			hasPdfExtension(name) || isPdfUri(contentResolver, uri) -> importPdf(uri, name)
+			else -> importDocumentTree(uri)
 		}
-		val dest = File(getOutputDir(), root.requireName())
-		dest.mkdir()
-		for (docFile in root.listFiles()) {
-			docFile.copyTo(dest)
-		}
-		return LocalMangaParser(dest).getManga(withDetails = false)
+		parseManga(dest)
 	}
+
+	private suspend fun importPdf(uri: Uri, name: String): File {
+		val outDir = File(getOutputDir(), name.substringBeforeLast('.')).also { it.mkdirs() }
+		runInterruptible(Dispatchers.IO) {
+			contentResolver.openFileDescriptor(uri, "r")?.use { pdf ->
+				PdfRenderer(pdf).use { renderer ->
+					repeat(renderer.pageCount) { i ->
+						renderer.openPage(i).use { page -> renderPdfPage(page, i, outDir) }
+					}
+				}
+			} ?: throw IOException("Cannot open descriptor: $uri")
+		}
+		return outDir
+	}
+
+	private fun renderPdfPage(page: PdfRenderer.Page, index: Int, outDir: File) {
+		val scale = (TARGET_PAGE_WIDTH / page.width.toFloat()).coerceIn(1f, MAX_SCALE)
+		val bitmap = createBitmap((page.width * scale).toInt(), (page.height * scale).toInt())
+			.also { it.eraseColor(Color.WHITE) }
+		try {
+			val matrix = Matrix().apply { setScale(scale, scale) }
+			page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+			File(outDir, "%04d.jpg".format(index + 1)).outputStream().use { out ->
+				bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out)
+			}
+		} finally {
+			bitmap.recycle()
+		}
+	}
+
+	private suspend fun importDocumentTree(uri: Uri): File {
+		val root = DocumentFile.fromTreeUri(context, uri)
+			?: throw IllegalArgumentException("Provided uri $uri is not a tree")
+		return File(getOutputDir(), root.requireName()).also { dest ->
+			dest.mkdir()
+			root.listFiles().forEach { it.copyTo(dest) }
+		}
+	}
+
+	private suspend fun parseManga(file: File): LocalManga =
+		LocalMangaParser(file).getManga(withDetails = false)
 
 	private suspend fun DocumentFile.copyTo(destDir: File) {
 		if (isDirectory) {
@@ -104,5 +149,11 @@ class SingleMangaImporter @Inject constructor(
 		return runCatching {
 			DocumentFile.fromTreeUri(context, uri)
 		}.isSuccess
+	}
+
+	companion object {
+		private const val TARGET_PAGE_WIDTH = 1200
+		private const val MAX_SCALE = 2f
+		private const val JPEG_QUALITY = 85
 	}
 }

@@ -179,6 +179,7 @@
     <string name="backup_restore">Backup and restore</string>
     <string name="create_backup">Create data backup</string>
     <string name="restore_backup">Restore from backup</string>
+    <string name="merge_with_existing_data">Merge with existing data</string>
     <string name="data_restored">Restored</string>
     <string name="preparing_">Preparing…</string>
     <string name="file_not_found">File not found</string>
@@ -223,6 +224,7 @@
     <string name="auth_not_supported_by">Logging in on %s is not supported</string>
     <string name="text_clear_cookies_prompt">You will be logged out from all sources</string>
     <string name="genres">Genres</string>
+    <string name="manga">Manga</string>
     <string name="state_finished">Finished</string>
     <string name="state_ongoing">Ongoing</string>
     <string name="system_default">Default</string>
@@ -600,6 +602,13 @@
     <string name="state_paused">Paused</string>
     <string name="reader_optimize">Reduce memory consumption (beta)</string>
     <string name="reader_optimize_summary">Reduce offscreen pages quality to use less memory</string>
+    <string name="e_ink">E-Ink</string>
+    <string name="flash_on_page_change">Flash on page change</string>
+    <string name="flash_on_page_change_summary">Refresh the screen with a short full-screen flash to reduce ghosting on E-Ink displays</string>
+    <string name="flash_duration">Flash duration</string>
+    <string name="flash_every">Flash every</string>
+    <string name="flash_with">Flash with</string>
+    <string name="milliseconds_pattern">%1$d ms</string>
     <string name="state">State</string>
     <string name="error_multiple_genres_not_supported">Filtering by multiple genres is not supported by this manga source</string>
     <string name="error_multiple_states_not_supported">Filtering by multiple states is not supported by this manga source</string>

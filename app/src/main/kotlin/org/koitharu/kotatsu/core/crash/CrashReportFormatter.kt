@@ -89,18 +89,20 @@ internal object CrashReportFormatter {
 		}
 	}
 
-	private fun buildReproduceSteps(stackTrace: String): String {
-		return """
-			The app crashed unexpectedly.
-
-			Please describe what you were doing before the crash.
-
-			Stack trace:
-
-			```text
-			$stackTrace
-			```
-		""".trimIndent()
+	// Built line-by-line on purpose: a raw `"""…""".trimIndent()` here would interpolate
+	// the multi-line `$stackTrace` content, which contains its own zero-indent lines (e.g.
+	// "Caused by:"). That dropped `trimIndent`'s computed minIndent to 0 and left the leading
+	// tabs in place on the header lines, which is what made #2/#3 render with garbled tabs.
+	private fun buildReproduceSteps(stackTrace: String): String = buildString {
+		appendLine("The app crashed unexpectedly.")
+		appendLine()
+		appendLine("Please describe what you were doing before the crash.")
+		appendLine()
+		appendLine("Stack trace:")
+		appendLine()
+		appendLine("```text")
+		appendLine(stackTrace)
+		append("```")
 	}
 
 	private fun buildBody(
@@ -112,34 +114,32 @@ internal object CrashReportFormatter {
 		threadName: String?,
 		processName: String?,
 		stackTrace: String,
-	): String {
-		return """
-			### Brief summary
-			$summary
-
-			### Steps to reproduce
-			$steps
-
-			### Kaisoku version
-			$appVersion
-
-			### Android version
-			$androidVersion
-
-			### Device
-			$device
-
-			### Runtime
-			Time: ${formatNow()}
-			Process: ${processName ?: "unknown"}
-			Thread: ${threadName ?: "unknown"}
-			Build type: ${BuildConfig.BUILD_TYPE}
-
-			### Stack trace
-			```text
-			$stackTrace
-			```
-		""".trimIndent()
+	): String = buildString {
+		appendLine("### Brief summary")
+		appendLine(summary)
+		appendLine()
+		appendLine("### Steps to reproduce")
+		appendLine(steps)
+		appendLine()
+		appendLine("### Kaisoku version")
+		appendLine(appVersion)
+		appendLine()
+		appendLine("### Android version")
+		appendLine(androidVersion)
+		appendLine()
+		appendLine("### Device")
+		appendLine(device)
+		appendLine()
+		appendLine("### Runtime")
+		appendLine("Time: ${formatNow()}")
+		appendLine("Process: ${processName ?: "unknown"}")
+		appendLine("Thread: ${threadName ?: "unknown"}")
+		appendLine("Build type: ${BuildConfig.BUILD_TYPE}")
+		appendLine()
+		appendLine("### Stack trace")
+		appendLine("```text")
+		appendLine(stackTrace)
+		append("```")
 	}
 
 	private fun buildAndroidVersion(): String {

@@ -152,6 +152,7 @@ class BackupRepository @Inject constructor(
         input: ZipInputStream,
         sections: Set<BackupSection>,
         progress: FlowCollector<Progress>?,
+        isMerge: Boolean = false,
     ): CompositeResult {
         progress?.emit(Progress.INDETERMINATE)
         var commonProgress = Progress(0, sections.size)
@@ -177,12 +178,12 @@ class BackupRepository @Inject constructor(
                     }
 
                     BackupSection.SETTINGS -> input.readMap().let {
-                        settings.upsertAll(it)
+                        settings.upsertAll(it, isMerge)
                         CompositeResult.success()
                     }
 
                     BackupSection.SETTINGS_READER_GRID -> input.readMap().let {
-                        tapGridSettings.upsertAll(it)
+                        tapGridSettings.upsertAll(it, isMerge)
                         CompositeResult.success()
                     }
 

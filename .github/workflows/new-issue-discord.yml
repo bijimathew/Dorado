@@ -19,10 +19,17 @@ jobs:
           NUMBER: ${{ github.event.issue.number }}
           TIMESTAMP: ${{ github.event.issue.created_at }}
         run: |
+          # Discord caps embed description at 4096 chars (total embed 6000). Crash-report
+          # bodies dwarf that and Discord answers 400 — silently killing the webhook.
+          # Truncate with headroom so we never trip the limit.
+          DESC="${BODY}"
+          if [ ${#DESC} -gt 3800 ]; then
+            DESC="${DESC:0:3800}"$'\n\n'"…(truncated; open the issue for full body)"
+          fi
           jq -n \
             --arg title "New Issue: ${TITLE}" \
             --arg url "${URL}" \
-            --arg description "${BODY}" \
+            --arg description "${DESC}" \
             --arg author_name "${USER_LOGIN}" \
             --arg author_icon "${USER_AVATAR}" \
             --arg footer "Issue #${NUMBER}" \

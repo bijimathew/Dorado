@@ -64,12 +64,16 @@ class StatsActivity : BaseActivity<ActivityStatsBinding>(),
 		viewBinding.chart.onSegmentClickListener = this
 		viewBinding.stubEmpty.setOnInflateListener(this)
 		viewBinding.chipPeriod.setOnClickListener(this)
+		viewBinding.chipType.setOnClickListener(this)
 
 		viewModel.isLoading.observe(this) {
 			viewBinding.progressBar.showOrHide(it)
 		}
 		viewModel.period.observe(this) {
 			viewBinding.chipPeriod.setText(it.titleResId)
+		}
+		viewModel.byGenre.observe(this) {
+			viewBinding.chipType.setText(if (it) R.string.genres else R.string.manga)
 		}
 		viewModel.favoriteCategories.observe(this, ::createCategoriesChips)
 		viewModel.onActionDone.observeEvent(this, ReversibleActionObserver(viewBinding.recyclerView))
@@ -79,7 +83,7 @@ class StatsActivity : BaseActivity<ActivityStatsBinding>(),
 				it.map { v ->
 					PieChartView.Segment(
 						value = (v.duration / 1000).toInt(),
-						label = v.manga?.title ?: getString(R.string.other_manga),
+						label = v.manga?.title ?: v.tagName ?: getString(R.string.other_manga),
 						percent = (v.duration.toDouble() / sum).toFloat(),
 						color = KotatsuColors.ofManga(this, v.manga),
 						tag = v.manga,
@@ -126,6 +130,7 @@ class StatsActivity : BaseActivity<ActivityStatsBinding>(),
 	override fun onClick(v: View) {
 		when (v.id) {
 			R.id.chip_period -> showPeriodSelector()
+			R.id.chip_type -> showTypeSelector()
 		}
 	}
 
@@ -219,6 +224,23 @@ class StatsActivity : BaseActivity<ActivityStatsBinding>(),
 			StatsPeriod.entries.getOrNull(it.order)?.also {
 				viewModel.period.value = it
 			} != null
+		}
+		menu.show()
+	}
+
+	private fun showTypeSelector() {
+		val menu = PopupMenu(this, viewBinding.chipType)
+		val byGenre = viewModel.byGenre.value
+		val mangaItem = menu.menu.add(R.id.group_stats_type, Menu.NONE, 0, R.string.manga)
+		mangaItem.isCheckable = true
+		mangaItem.isChecked = !byGenre
+		val genreItem = menu.menu.add(R.id.group_stats_type, Menu.NONE, 1, R.string.genres)
+		genreItem.isCheckable = true
+		genreItem.isChecked = byGenre
+		menu.menu.setGroupCheckable(R.id.group_stats_type, true, true)
+		menu.setOnMenuItemClickListener {
+			viewModel.byGenre.value = it.order == 1
+			true
 		}
 		menu.show()
 	}

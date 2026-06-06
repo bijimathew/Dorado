@@ -4,6 +4,7 @@ import android.app.assist.AssistContent
 import android.content.Context
 import android.graphics.RenderEffect
 import android.graphics.Shader
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.text.SpannedString
@@ -31,8 +32,11 @@ import coil3.request.crossfade
 import coil3.request.lifecycle
 import coil3.request.transformations
 import coil3.size.Precision
+import coil3.size.Size as CoilSize
 import coil3.transform.RoundedCornersTransformation
+import androidx.core.graphics.ColorUtils
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.chip.Chip
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.Flow
@@ -165,11 +169,7 @@ class DetailsActivity :
 		infoBinding.textViewAuthor.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.textViewDescription.movementMethod = LinkMovementMethodCompat.getInstance()
 		viewBinding.chipsTags.onChipClickListener = this
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-			viewBinding.backdrop.setRenderEffect(
-				RenderEffect.createBlurEffect(24f, 24f, Shader.TileMode.CLAMP),
-			)
-		}
+		setupBackdropChrome()
 		TitleScrollCoordinator(viewBinding.textViewTitle).attach(viewBinding.scrollView)
 		if (settings.isDescriptionExpanded) {
 			viewBinding.textViewDescription.maxLines = Int.MAX_VALUE - 1
@@ -377,6 +377,7 @@ class DetailsActivity :
 	}
 
 	private fun onFavoritesChanged(categories: Set<FavouriteCategory>) {
+		invalidateOptionsMenu()
 		val chip = viewBinding.chipFavorite
 		chip.setChipIconResource(if (categories.isEmpty()) R.drawable.ic_heart_outline else R.drawable.ic_heart)
 		chip.text = if (categories.isEmpty()) {
@@ -388,13 +389,13 @@ class DetailsActivity :
 
 	private fun onLocalSizeChanged(size: Long) {
 		if (size == 0L) {
-			infoBinding.textViewLocal.isVisible = false
-			infoBinding.textViewLocalLabel.isVisible = false
+			infoBinding.metaLocalCell.isVisible = false
 		} else {
 			infoBinding.textViewLocal.text = FileSize.BYTES.format(this, size)
-			infoBinding.textViewLocal.isVisible = true
-			infoBinding.textViewLocalLabel.isVisible = true
+			infoBinding.metaLocalCell.isVisible = true
 		}
+		infoBinding.metaRatingLocalRow.isVisible =
+			infoBinding.metaRatingCell.isVisible || infoBinding.metaLocalCell.isVisible
 	}
 
 	private fun onRelatedMangaChanged(related: List<MangaListModel>) {
@@ -456,21 +457,28 @@ class DetailsActivity :
 			infoBinding.textViewTranslationLabel.isVisible = infoBinding.textViewTranslation.isVisible
 			textViewAuthor.textAndVisible = manga.getAuthorsString()
 			textViewAuthorLabel.isVisible = textViewAuthor.isVisible
+			metaAuthorCell.isVisible = textViewAuthor.isVisible
+			manga.state?.let { state ->
+				textViewState.textAndVisible = resources.getString(state.titleResId)
+				textViewStateLabel.isVisible = textViewState.isVisible
+				metaStateCell.isVisible = textViewState.isVisible
+			} ?: run {
+				textViewState.isVisible = false
+				textViewStateLabel.isVisible = false
+				metaStateCell.isVisible = false
+			}
+			metaAuthorStateRow.isVisible = metaAuthorCell.isVisible || metaStateCell.isVisible
 			if (manga.hasRating) {
 				ratingBarRating.rating = manga.rating * ratingBarRating.numStars
 				ratingBarRating.isVisible = true
 				textViewRatingLabel.isVisible = true
+				metaRatingCell.isVisible = true
 			} else {
 				ratingBarRating.isVisible = false
 				textViewRatingLabel.isVisible = false
+				metaRatingCell.isVisible = false
 			}
-			manga.state?.let { state ->
-				textViewState.textAndVisible = resources.getString(state.titleResId)
-				textViewStateLabel.isVisible = textViewState.isVisible
-			} ?: run {
-				textViewState.isVisible = false
-				textViewStateLabel.isVisible = false
-			}
+			metaRatingLocalRow.isVisible = metaRatingCell.isVisible || metaLocalCell.isVisible
 
 			if (manga.source == LocalMangaSource || manga.source == UnknownMangaSource) {
 				textViewSource.isVisible = false
@@ -529,14 +537,13 @@ class DetailsActivity :
 			val displayPercent = if (ReadingProgress.isCompleted(info.percent)) 100 else (info.percent * 100f).toInt()
 			getString(R.string.percent_string_pattern, displayPercent.toString())
 		}
-
 		progress.setProgressCompat(
 			(progress.max * info.percent.coerceIn(0f, 1f)).roundToInt(),
 			true,
 		)
 		textViewProgressLabel.isVisible = info.history != null
-		textViewProgress.isVisible = info.history != null
 		progress.isVisible = info.history != null
+		metaProgressRow.isVisible = info.history != null
 	}
 
 	private fun onTagsChanged(tags: Collection<ChipsView.ChipModel>) {
@@ -546,19 +553,70 @@ class DetailsActivity :
 
 	private fun loadCover(imageUrl: String?) {
 		viewBinding.imageViewCover.setImageAsync(imageUrl, viewModel.getMangaOrNull())
-		viewBinding.imageViewCoverBg?.let { bg ->
-			val isVisible = !imageUrl.isNullOrBlank()
-			bg.isVisible = isVisible
-			if (isVisible) {
-				bg.setImageAsync(imageUrl, viewModel.getMangaOrNull())
-			}
-		}
 	}
 
 	private fun loadBackdrop(imageUrl: String?) {
 		val isVisible = !imageUrl.isNullOrBlank()
-		viewBinding.backdropContainer.isVisible = isVisible
+		viewBinding.backdrop.isVisible = isVisible
+		viewBinding.backdropScrim.isVisible = isVisible
+		viewBinding.backdropClickArea.isVisible = isVisible
 		viewBinding.backdrop.setImageAsync(imageUrl, viewModel.getMangaOrNull())
+	}
+
+	/**
+	 * Pin the backdrop image to a tiny canonical size and apply a fixed blur on top. Forcing the
+	 * input to a known small bitmap means a constant `RenderEffect` radius produces a constant
+	 * on-screen blur across every source, no matter what resolution it serves cover art at — and
+	 * sidesteps the race where a callback-driven radius update can miss the first frame.
+	 *
+	 * A bottom-anchored gradient scrim then fades the backdrop into the info-card surface colour
+	 * so the header reads as one continuous block instead of two stacked panels. The scrim is
+	 * stronger than the previous version (and extends further up) so the title/subtitles still
+	 * read against bright covers. The backdrop+scrim also parallax-scroll at half the content
+	 * speed for an effect closer to Kototoro's animated panorama header.
+	 */
+	private fun setupBackdropChrome() {
+		val backdrop = viewBinding.backdrop
+		backdrop.exactImageSize = CoilSize(BACKDROP_CANONICAL_WIDTH_PX, BACKDROP_CANONICAL_HEIGHT_PX)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			backdrop.setRenderEffect(
+				RenderEffect.createBlurEffect(
+					BACKDROP_BLUR_RADIUS_PX,
+					BACKDROP_BLUR_RADIUS_PX,
+					Shader.TileMode.CLAMP,
+				),
+			)
+		}
+		val surface = MaterialColors.getColor(
+			viewBinding.backdropScrim,
+			com.google.android.material.R.attr.colorSurface,
+		)
+		viewBinding.backdropScrim.background = GradientDrawable(
+			GradientDrawable.Orientation.TOP_BOTTOM,
+			intArrayOf(
+				// Theme-adaptive surface wash across the whole content area.
+				// Top is a noticeable wash (was 0x80, now 0xA8) so title text
+				// stays readable on bright/busy covers; the wash darkens
+				// through the middle and lands on full surface at the card
+				// boundary so the join into the info card is seamless.
+				ColorUtils.setAlphaComponent(surface, 0xA8),
+				ColorUtils.setAlphaComponent(surface, 0xA8),
+				ColorUtils.setAlphaComponent(surface, 0xC8),
+				ColorUtils.setAlphaComponent(surface, 0xE8),
+				surface,
+			),
+		)
+		// Parallax: as the content scrolls up, drift the backdrop+scrim up at half speed.
+		// Mimics Kototoro's panorama-style header without paying for a full Compose layer.
+		// Uses the View-level scroll-change listener (separate field from NestedScrollView's
+		// own listener slot) so it doesn't clash with TitleScrollCoordinator.
+		viewBinding.scrollView.setOnScrollChangeListener(
+			View.OnScrollChangeListener { _, _, scrollY, _, _ ->
+				val translation = -scrollY * BACKDROP_PARALLAX_FACTOR
+				viewBinding.backdrop.translationY = translation
+				viewBinding.backdropScrim.translationY = translation
+			},
+		)
 	}
 
 	private fun showTextDialog(text: String) {
@@ -618,5 +676,13 @@ class DetailsActivity :
 	companion object {
 
 		private const val FAV_LABEL_LIMIT = 16
+
+		/** Canonical pixel size we sample backdrop covers down to so blur stays consistent. */
+		private const val BACKDROP_CANONICAL_WIDTH_PX = 256
+		private const val BACKDROP_CANONICAL_HEIGHT_PX = 144
+		/** RenderEffect radius in source pixels — large relative to the 256-px input. */
+		private const val BACKDROP_BLUR_RADIUS_PX = 16f
+		/** Backdrop scrolls at this fraction of the content speed (0 = no parallax, 1 = locked to content). */
+		private const val BACKDROP_PARALLAX_FACTOR = 0.5f
 	}
 }

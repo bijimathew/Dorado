@@ -1,0 +1,6 @@
+- fixed issue #2, #3 (every source crashed on open in 9.7.7-1/9.7.7-2)
+- fixed in-app "Report bug" issue rendering
+- parser pin → 161379fa: fixed Comix
+- fixed Discord webhooks
+- details screen - details screen redesign
+
