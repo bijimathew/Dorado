@@ -38,6 +38,7 @@ private const val STATUS_ONLINE = "online"
 private const val STATUS_IDLE = "idle"
 private const val BUTTON_TEXT_LIMIT = 32
 private const val DEBOUNCE_TIMEOUT = 16_000L // 16 sec
+private const val WSRV_PREFIX = "https://wsrv.nl/?url="
 
 @ViewModelScoped
 class DiscordRpc @Inject constructor(
@@ -88,6 +89,11 @@ class DiscordRpc @Inject constructor(
 				clearRpc()
 				return
 			}
+			// Prefer the high-res cover when the source ships one — small thumbnails get
+			// rejected by Discord's media proxy and show as the placeholder card on the user
+			// profile. Trim blanks so an empty string doesn't shadow a real fallback.
+			val coverUrl = manga.largeCoverUrl?.takeUnless { it.isBlank() }
+				?: manga.coverUrl?.takeUnless { it.isBlank() }
 			updateRpcAsync(
 				activity = Activity(
 					applicationId = appId,
@@ -99,7 +105,7 @@ class DiscordRpc @Inject constructor(
 						start = lastActivity?.timestamps?.start ?: System.currentTimeMillis(),
 					),
 					assets = Assets(
-						largeImage = manga.coverUrl,
+						largeImage = coverUrl,
 						largeText = context.getString(R.string.reading_s, manga.title),
 						smallText = context.getString(R.string.discord_rpc_description),
 						smallImage = appIcon,
@@ -127,7 +133,12 @@ class DiscordRpc @Inject constructor(
 			val mappedActivity = activity.copy(
 				assets = activity.assets?.let {
 					it.copy(
-						largeImage = it.largeImage?.toMediaProxyUrl(),
+						// Route source covers through wsrv.nl before handing them to Discord:
+						// most parser hosts gate the cover behind a Referer header and Discord's
+						// media proxy fetches anonymously, so the upload silently fails and the
+						// user profile renders the "?" placeholder card. wsrv.nl provides a
+						// stable, headerless URL Discord can re-host without trouble.
+						largeImage = it.largeImage?.toWsrvProxy()?.toMediaProxyUrl(),
 						smallImage = it.smallImage?.toMediaProxyUrl(),
 					)
 				},
@@ -158,6 +169,17 @@ class DiscordRpc @Inject constructor(
 		}.onFailure {
 			it.printStackTraceDebug()
 		}.getOrNull()
+	}
+
+	/**
+	 * Wrap an http(s) image URL through wsrv.nl so the eventual fetcher (Discord's media proxy)
+	 * receives a stable headerless URL. Pass-through for already-proxied URLs and for anything
+	 * that isn't a network image (e.g. existing Discord `mp:` URLs, app icons on local schemes).
+	 */
+	private fun String.toWsrvProxy(): String {
+		if (startsWith(WSRV_PREFIX, ignoreCase = true)) return this
+		if (!startsWith("http://", ignoreCase = true) && !startsWith("https://", ignoreCase = true)) return this
+		return WSRV_PREFIX + java.net.URLEncoder.encode(this, Charsets.UTF_8.name()) + "&we"
 	}
 
 	private fun getRpc(): KizzyRPC? {
