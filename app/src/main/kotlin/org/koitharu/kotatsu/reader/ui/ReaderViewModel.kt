@@ -30,6 +30,7 @@ import org.koitharu.kotatsu.R
 import org.koitharu.kotatsu.bookmarks.domain.Bookmark
 import org.koitharu.kotatsu.bookmarks.domain.BookmarksRepository
 import org.koitharu.kotatsu.core.exceptions.EmptyMangaException
+import org.koitharu.kotatsu.core.model.LocalMangaSource
 import org.koitharu.kotatsu.core.model.getPreferredBranch
 import org.koitharu.kotatsu.core.nav.MangaIntent
 import org.koitharu.kotatsu.core.nav.ReaderIntent
@@ -332,6 +333,27 @@ class ReaderViewModel @Inject constructor(
             )
             content.value = ReaderContent(chaptersLoader.snapshot(), newState)
             saveCurrentState(newState)
+        }
+    }
+
+    override suspend fun onDownloadComplete(downloadedManga: LocalManga?) {
+        super.onDownloadComplete(downloadedManga)
+        // When the chapter currently open in the reader finishes downloading, swap it to the
+        // local copy in place so the open chapter starts serving downloaded pages without a reopen.
+        val state = readingState.value ?: return
+        val details = mangaDetails.value ?: return
+        if (downloadedManga != null && details.id == downloadedManga.manga.id) {
+            chaptersLoader.init(details)
+            if (chaptersLoader.peekChapter(state.chapterId)?.source == LocalMangaSource) {
+                val pages = chaptersLoader.getPages(state.chapterId)
+                if (pages.isEmpty() || pages.first().source != LocalMangaSource) {
+                    runCatchingCancellable {
+                        chaptersLoader.loadSingleChapter(state.chapterId)
+                    }.onSuccess {
+                        content.value = ReaderContent(chaptersLoader.snapshot(), state)
+                    }
+                }
+            }
         }
     }
 
