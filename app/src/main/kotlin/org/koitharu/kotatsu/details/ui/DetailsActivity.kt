@@ -570,7 +570,10 @@ class DetailsActivity :
 	 * sidesteps the race where a callback-driven radius update can miss the first frame.
 	 *
 	 * A bottom-anchored gradient scrim then fades the backdrop into the info-card surface colour
-	 * so the header reads as one continuous block instead of two stacked panels.
+	 * so the header reads as one continuous block instead of two stacked panels. The scrim is
+	 * stronger than the previous version (and extends further up) so the title/subtitles still
+	 * read against bright covers. The backdrop+scrim also parallax-scroll at half the content
+	 * speed for an effect closer to Kototoro's animated panorama header.
 	 */
 	private fun setupBackdropChrome() {
 		val backdrop = viewBinding.backdrop
@@ -591,15 +594,28 @@ class DetailsActivity :
 		viewBinding.backdropScrim.background = GradientDrawable(
 			GradientDrawable.Orientation.TOP_BOTTOM,
 			intArrayOf(
-				// Theme-adaptive surface wash across the whole content area so
-				// title + meta-table text stays readable on top of vivid covers.
-				// Stays smooth (no hard edges) and adapts: in dark theme the
-				// wash is dark-on-bright, in light theme light-on-dark.
-				ColorUtils.setAlphaComponent(surface, 0x80),
-				ColorUtils.setAlphaComponent(surface, 0x80),
-				ColorUtils.setAlphaComponent(surface, 0xB0),
+				// Theme-adaptive surface wash across the whole content area.
+				// Top is a noticeable wash (was 0x80, now 0xA8) so title text
+				// stays readable on bright/busy covers; the wash darkens
+				// through the middle and lands on full surface at the card
+				// boundary so the join into the info card is seamless.
+				ColorUtils.setAlphaComponent(surface, 0xA8),
+				ColorUtils.setAlphaComponent(surface, 0xA8),
+				ColorUtils.setAlphaComponent(surface, 0xC8),
+				ColorUtils.setAlphaComponent(surface, 0xE8),
 				surface,
 			),
+		)
+		// Parallax: as the content scrolls up, drift the backdrop+scrim up at half speed.
+		// Mimics Kototoro's panorama-style header without paying for a full Compose layer.
+		// Uses the View-level scroll-change listener (separate field from NestedScrollView's
+		// own listener slot) so it doesn't clash with TitleScrollCoordinator.
+		viewBinding.scrollView.setOnScrollChangeListener(
+			View.OnScrollChangeListener { _, _, scrollY, _, _ ->
+				val translation = -scrollY * BACKDROP_PARALLAX_FACTOR
+				viewBinding.backdrop.translationY = translation
+				viewBinding.backdropScrim.translationY = translation
+			},
 		)
 	}
 
@@ -666,5 +682,7 @@ class DetailsActivity :
 		private const val BACKDROP_CANONICAL_HEIGHT_PX = 144
 		/** RenderEffect radius in source pixels — large relative to the 256-px input. */
 		private const val BACKDROP_BLUR_RADIUS_PX = 16f
+		/** Backdrop scrolls at this fraction of the content speed (0 = no parallax, 1 = locked to content). */
+		private const val BACKDROP_PARALLAX_FACTOR = 0.5f
 	}
 }
