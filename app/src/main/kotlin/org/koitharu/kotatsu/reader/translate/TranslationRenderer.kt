@@ -48,7 +48,6 @@ class TranslationRenderer @Inject constructor(
 			isAntiAlias = true
 		}
 
-		data class Prepared(val rect: RectF, val layout: StaticLayout)
 		val prepared = blocks.map { block ->
 			val box = denormalize(block.rect, out.width, out.height)
 			val layout = fitLayout(block.translatedText, basePaint, box, padding)
@@ -65,8 +64,11 @@ class TranslationRenderer @Inject constructor(
 			if (top < 0f) { bottom -= top; top = 0f }
 			if (right > out.width) { left -= right - out.width; right = out.width.toFloat() }
 			if (bottom > out.height) { top -= bottom - out.height; bottom = out.height.toFloat() }
-			Prepared(RectF(left, top, right, bottom), layout)
+			Prepared(RectF(left, top, right, bottom), layout, cy)
 		}
+		// Spread overlapping boxes apart vertically so none is buried inside another,
+		// keeping each block in its source vertical order (a higher bubble stays higher).
+		separateOverlaps(prepared, out.height)
 
 		if (overlayBg) {
 			for (p in prepared) {
@@ -81,6 +83,47 @@ class TranslationRenderer @Inject constructor(
 			canvas.restore()
 		}
 		return out
+	}
+
+	private class Prepared(val rect: RectF, val layout: StaticLayout, val anchorY: Float)
+
+	/**
+	 * Resolve overlaps between rendered text boxes by sliding them apart on the Y axis.
+	 * Each box is anchored to [Prepared.anchorY] (its source bubble's vertical centre), so
+	 * when two boxes collide the one whose original text sat higher is pushed up and the
+	 * lower one down — overlaps (and fully-nested boxes) separate without scrambling reading
+	 * order. Runs a few relaxation rounds because clamping a box back on-screen can nudge it
+	 * into a neighbour again. Horizontal placement is left untouched.
+	 */
+	private fun separateOverlaps(items: List<Prepared>, height: Int) {
+		if (items.size < 2) return
+		val gap = dp(2f)
+		val maxY = height.toFloat()
+		repeat(SEPARATE_ROUNDS) {
+			var moved = false
+			for (i in items.indices) {
+				for (j in i + 1 until items.size) {
+					val a = items[i]
+					val b = items[j]
+					if (!RectF.intersects(a.rect, b.rect)) continue
+					val upper = if (a.anchorY <= b.anchorY) a else b
+					val lower = if (upper === a) b else a
+					val overlap = upper.rect.bottom - lower.rect.top + gap
+					if (overlap > 0f) {
+						val shift = overlap / 2f
+						upper.rect.offset(0f, -shift)
+						lower.rect.offset(0f, shift)
+						moved = true
+					}
+				}
+			}
+			// Keep every box on the bitmap; the next round mops up overlaps this re-introduces.
+			for (p in items) {
+				if (p.rect.top < 0f) p.rect.offset(0f, -p.rect.top)
+				if (p.rect.bottom > maxY) p.rect.offset(0f, maxY - p.rect.bottom)
+			}
+			if (!moved) return
+		}
 	}
 
 	private fun denormalize(rect: RectF, width: Int, height: Int): RectF =
@@ -144,5 +187,6 @@ class TranslationRenderer @Inject constructor(
 	private companion object {
 		const val MIN_SIZE_DP = 9f
 		const val MAX_SIZE_DP = 22f
+		const val SEPARATE_ROUNDS = 8
 	}
 }
