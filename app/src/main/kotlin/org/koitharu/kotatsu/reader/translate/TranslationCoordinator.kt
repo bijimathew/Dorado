@@ -87,7 +87,12 @@ class TranslationCoordinator @Inject constructor(
 						return@withPermit
 					}
 					val blocks = mergeOverlappingBlocks(rawBlocks)
-					val rendered = runInterruptible { renderer.render(bitmap, blocks, settings.translateOverlayBackground) }
+					val rendered = try {
+						runInterruptible { renderer.render(bitmap, blocks, settings.translateOverlayBackground) }
+					} catch (e: Throwable) {
+						bitmap.recycle()
+						throw e
+					}
 					if (rendered !== bitmap) bitmap.recycle()
 					cache.put(key, rendered, blocks)
 					state.value = PageTranslationState.Done(rendered, blocks)
@@ -111,17 +116,20 @@ class TranslationCoordinator @Inject constructor(
 	suspend fun requestOcr(page: MangaPage): List<TranslatedBlock> {
 		cache.get(cache.keyFor(page.id, settings))?.let { return it.blocks }
 		if (activeJobs.getAndIncrement() == 0) _isBusy.value = true
-		val bitmap = loadSourceBitmap(page)
 		return try {
-			mergeOverlappingBlocks(
-				translator.translatePage(
-					bitmap = bitmap,
-					sourceLang = settings.translateSourceLanguage,
-					targetLang = settings.translateTargetLanguage,
-				),
-			)
+			val bitmap = loadSourceBitmap(page)
+			try {
+				mergeOverlappingBlocks(
+					translator.translatePage(
+						bitmap = bitmap,
+						sourceLang = settings.translateSourceLanguage,
+						targetLang = settings.translateTargetLanguage,
+					),
+				)
+			} finally {
+				bitmap.recycle()
+			}
 		} finally {
-			bitmap.recycle()
 			if (activeJobs.decrementAndGet() == 0) _isBusy.value = false
 		}
 	}
