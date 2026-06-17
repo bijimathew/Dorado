@@ -35,8 +35,6 @@ import org.koitharu.kotatsu.parsers.exception.AuthRequiredException
 import org.koitharu.kotatsu.parsers.exception.NotFoundException
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaSource
-import org.koitharu.kotatsu.scrobbling.common.domain.ScrobblerAuthRequiredException
-import org.koitharu.kotatsu.scrobbling.common.ui.ScrobblerAuthHelper
 import org.koitharu.kotatsu.settings.sources.auth.SourceAuthActivity
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import java.security.cert.CertPathValidatorException
@@ -50,7 +48,6 @@ class ExceptionResolver private constructor(
     private val host: Host,
     private val settings: AppSettings,
     private val captchaCoordinator: CaptchaAutoResolveCoordinator,
-    private val scrobblerAuthHelperProvider: Provider<ScrobblerAuthHelper>,
 ) {
     private val continuations = MutableScatterMap<String, Continuation<Boolean>>(1)
 
@@ -110,17 +107,7 @@ class ExceptionResolver private constructor(
                 false
             }
 
-            is ScrobblerAuthRequiredException -> {
-                val authHelper = scrobblerAuthHelperProvider.get()
-                if (authHelper.isAuthorized(e.scrobbler)) {
-                    true
-                } else {
-                    host.withContext {
-                        authHelper.startAuth(this, e.scrobbler).onFailure(::showErrorDetails)
-                    }
-                    false
-                }
-            }
+
 
             else -> false
         }
@@ -201,21 +188,18 @@ class ExceptionResolver private constructor(
     class Factory @Inject constructor(
         private val settings: AppSettings,
         private val captchaCoordinator: CaptchaAutoResolveCoordinator,
-        private val scrobblerAuthHelperProvider: Provider<ScrobblerAuthHelper>,
     ) {
 
         fun create(fragment: Fragment) = ExceptionResolver(
             host = Host.FragmentHost(fragment),
             settings = settings,
             captchaCoordinator = captchaCoordinator,
-            scrobblerAuthHelperProvider = scrobblerAuthHelperProvider,
         )
 
         fun create(activity: FragmentActivity) = ExceptionResolver(
             host = Host.ActivityHost(activity),
             settings = settings,
             captchaCoordinator = captchaCoordinator,
-            scrobblerAuthHelperProvider = scrobblerAuthHelperProvider,
         )
     }
 
@@ -267,7 +251,6 @@ class ExceptionResolver private constructor(
         @StringRes
         fun getResolveStringId(e: Throwable) = when (e) {
             is CloudFlareProtectedException -> R.string.captcha_solve
-            is ScrobblerAuthRequiredException,
             is AuthRequiredException -> R.string.sign_in
 
             is NotFoundException -> if (e.url.isHttpUrl() || e.url.startsWith("//")) R.string.open_in_browser else 0

@@ -96,8 +96,7 @@ import org.koitharu.kotatsu.details.data.ReadingTime
 import org.koitharu.kotatsu.details.service.MangaPrefetchService
 import org.koitharu.kotatsu.details.ui.model.ChapterListItem
 import org.koitharu.kotatsu.details.ui.model.HistoryInfo
-import org.koitharu.kotatsu.details.ui.scrobbling.ScrobblingItemDecoration
-import org.koitharu.kotatsu.details.ui.scrobbling.ScrollingInfoAdapter
+
 import org.koitharu.kotatsu.download.ui.worker.DownloadStartedObserver
 import org.koitharu.kotatsu.list.domain.ReadingProgress
 import org.koitharu.kotatsu.list.ui.adapter.ListItemType
@@ -112,7 +111,7 @@ import org.koitharu.kotatsu.parsers.model.MangaTag
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
 import org.koitharu.kotatsu.parsers.util.nullIfEmpty
 import org.koitharu.kotatsu.parsers.util.toTitleCase
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingInfo
+
 import javax.inject.Inject
 import kotlin.math.roundToInt
 import com.google.android.material.R as materialR
@@ -161,7 +160,7 @@ class DetailsActivity :
 		viewBinding.textViewTitle.setOnClickListener(this)
 		viewBinding.textViewSubtitle.setOnClickListener(this)
 		viewBinding.buttonDescriptionMore.setOnClickListener(this)
-		viewBinding.buttonScrobblingMore.setOnClickListener(this)
+
 		viewBinding.buttonRelatedMore.setOnClickListener(this)
 		viewBinding.textViewDescription.addOnLayoutChangeListener(this)
 		viewBinding.swipeRefreshLayout.setOnRefreshListener(this)
@@ -198,7 +197,7 @@ class DetailsActivity :
 			onHistoryChanged(it.first, it.second)
 		}
 		viewModel.isLoading.observe(this, ::onLoadingStateChanged)
-		viewModel.scrobblingInfo.observe(this, ::onScrobblingInfoChanged)
+
 		viewModel.localSize.observe(this, ::onLocalSizeChanged)
 		viewModel.relatedManga.observe(this, ::onRelatedMangaChanged)
 		viewModel.favouriteCategories.observe(this, ::onFavoritesChanged)
@@ -275,13 +274,6 @@ class DetailsActivity :
 				} else {
 					tv.maxLines = resources.getInteger(R.integer.details_description_lines)
 				}
-			}
-
-			R.id.button_scrobbling_more -> {
-				router.showScrobblingSelectorSheet(
-					manga = viewModel.getMangaOrNull() ?: return,
-					scrobblerService = viewModel.scrobblingInfo.value.firstOrNull()?.scrobbler,
-				)
 			}
 
 			R.id.button_related_more -> {
@@ -423,18 +415,7 @@ class DetailsActivity :
 		viewBinding.swipeRefreshLayout.isRefreshing = isLoading
 	}
 
-	private fun onScrobblingInfoChanged(scrobblings: List<ScrobblingInfo>) {
-		var adapter = viewBinding.recyclerViewScrobbling.adapter as? ScrollingInfoAdapter
-		viewBinding.groupScrobbling.isGone = scrobblings.isEmpty()
-		if (adapter != null) {
-			adapter.items = scrobblings
-		} else {
-			adapter = ScrollingInfoAdapter(router)
-			adapter.items = scrobblings
-			viewBinding.recyclerViewScrobbling.adapter = adapter
-			viewBinding.recyclerViewScrobbling.addItemDecoration(ScrobblingItemDecoration())
-		}
-	}
+
 
 	private fun onMangaUpdated(details: MangaDetails) {
 		val manga = details.toManga()

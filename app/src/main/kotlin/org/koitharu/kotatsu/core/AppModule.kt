@@ -48,7 +48,6 @@ import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.ui.image.CoilImageGetter
 import org.koitharu.kotatsu.core.ui.util.ActivityRecreationHandle
 import org.koitharu.kotatsu.core.ui.util.ForegroundActivityHolder
-import org.koitharu.kotatsu.core.util.AcraScreenLogger
 import org.koitharu.kotatsu.core.util.FileSize
 import org.koitharu.kotatsu.core.util.ext.activityManager
 import org.koitharu.kotatsu.core.util.ext.connectivityManager
@@ -195,13 +194,11 @@ interface AppModule {
 		fun provideActivityLifecycleCallbacks(
 			appProtectHelper: AppProtectHelper,
 			activityRecreationHandle: ActivityRecreationHandle,
-			acraScreenLogger: AcraScreenLogger,
 			screenshotPolicyHelper: ScreenshotPolicyHelper,
 			foregroundActivityHolder: ForegroundActivityHolder,
 		): Set<@JvmSuppressWildcards Application.ActivityLifecycleCallbacks> = arraySetOf(
 			appProtectHelper,
 			activityRecreationHandle,
-			acraScreenLogger,
 			screenshotPolicyHelper,
 			foregroundActivityHolder,
 		)

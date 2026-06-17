@@ -606,15 +606,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val is32BitColorsEnabled: Boolean
 		get() = prefs.getBoolean(KEY_32BIT_COLOR, false)
 
-	val isDiscordRpcEnabled: Boolean
-		get() = prefs.getBoolean(KEY_DISCORD_RPC, false)
-
-	val isDiscordRpcSkipNsfw: Boolean
-		get() = prefs.getBoolean(KEY_DISCORD_RPC_SKIP_NSFW, false)
-
-	var discordToken: String?
-		get() = prefs.getString(KEY_DISCORD_TOKEN, null)?.trim()?.nullIfEmpty()
-		set(value) = prefs.edit { putString(KEY_DISCORD_TOKEN, value?.nullIfEmpty()) }
 
 	val isPeriodicalBackupEnabled: Boolean
 		get() = prefs.getBoolean(KEY_BACKUP_PERIODICAL_ENABLED, false)
@@ -636,14 +627,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		get() = prefs.getString(KEY_BACKUP_PERIODICAL_OUTPUT, null)?.toUriOrNull()
 		set(value) = prefs.edit { putString(KEY_BACKUP_PERIODICAL_OUTPUT, value?.toString()) }
 
-	val isBackupTelegramUploadEnabled: Boolean
-		get() = prefs.getBoolean(KEY_BACKUP_TG_ENABLED, false)
-
-	val backupTelegramChatId: String?
-		get() = prefs.getString(KEY_BACKUP_TG_CHAT, null)?.nullIfEmpty()
-
-	val backupTelegramBotToken: String?
-		get() = prefs.getString(KEY_BACKUP_TG_TOKEN, null)?.trim()?.nullIfEmpty()
 
 	val isReadingTimeEstimationEnabled: Boolean
 		get() = prefs.getBoolean(KEY_READING_TIME, true)
@@ -856,10 +839,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SUGGESTIONS_EXCLUDE_TAGS = "suggestions_exclude_tags"
 		const val KEY_SUGGESTIONS_DISABLED_SOURCES = "suggestions_disabled_sources"
 		const val KEY_SUGGESTIONS_NOTIFICATIONS = "suggestions_notifications"
-		const val KEY_SHIKIMORI = "shikimori"
-		const val KEY_ANILIST = "anilist"
-		const val KEY_MAL = "mal"
-		const val KEY_KITSU = "kitsu"
 		const val KEY_DOWNLOADS_METERED_NETWORK = "downloads_metered_network"
 		const val KEY_DOWNLOADS_FORMAT = "downloads_format"
 		const val KEY_ALL_FAVOURITES_VISIBLE = "all_favourites_visible"
@@ -938,28 +917,21 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SOURCES_HIDE_BROKEN = "sources_hide_broken"
 		const val KEY_QUICK_FILTER = "quick_filter"
 		const val KEY_COLLAPSE_DESCRIPTION = "description_collapse"
-		const val KEY_BACKUP_TG_ENABLED = "backup_periodic_tg_enabled"
-		const val KEY_BACKUP_TG_CHAT = "backup_periodic_tg_chat_id"
-		const val KEY_BACKUP_TG_TOKEN = "backup_periodic_tg_bot_token"
+
 		const val KEY_MANGA_LIST_BADGES = "manga_list_badges"
-		const val KEY_DISCORD_RPC = "discord_rpc"
-		const val KEY_DISCORD_RPC_SKIP_NSFW = "discord_rpc_skip_nsfw"
-		const val KEY_DISCORD_TOKEN = "discord_token"
 
 		// keys for non-persistent preferences
 		const val KEY_APP_VERSION = "app_version"
 		const val KEY_IGNORE_DOZE = "ignore_dose"
 		const val KEY_TRACKER_DEBUG = "tracker_debug"
 		const val KEY_LINK_WEBLATE = "about_app_translation"
-		const val KEY_LINK_DISCORD = "about_discord"
+
 		const val KEY_LINK_GITHUB = "about_github"
 		const val KEY_LINK_MANUAL = "about_help"
 		const val KEY_PROXY_TEST = "proxy_test"
 		const val KEY_OPEN_BROWSER = "open_browser"
 		const val KEY_HANDLE_LINKS = "handle_links"
-		const val KEY_BACKUP_TG = "backup_periodic_tg"
-		const val KEY_BACKUP_TG_OPEN = "backup_periodic_tg_open"
-		const val KEY_BACKUP_TG_TEST = "backup_periodic_tg_test"
+
 		const val KEY_CLEAR_MANGA_DATA = "manga_data_clear"
 		const val KEY_STORAGE_USAGE = "storage_usage"
 		const val KEY_WEBVIEW_CLEAR = "webview_clear"

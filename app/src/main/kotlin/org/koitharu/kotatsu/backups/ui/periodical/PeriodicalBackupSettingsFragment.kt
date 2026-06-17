@@ -34,8 +34,7 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 	ActivityResultCallback<Uri?>,
 	SharedPreferences.OnSharedPreferenceChangeListener {
 
-	@Inject
-	lateinit var telegramBackupUploader: TelegramBackupUploader
+
 
 	private val viewModel by viewModels<PeriodicalBackupSettingsViewModel>()
 
@@ -43,27 +42,7 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_backup_periodic)
-		findPreference<PreferenceCategory>(AppSettings.KEY_BACKUP_TG)?.isVisible = true
-		findPreference<EditTextPreference>(AppSettings.KEY_BACKUP_TG_TOKEN)?.let { pref ->
-			@Suppress("UsePropertyAccessSyntax")
-			pref.setOnBindEditTextListener(
-				EditTextBindListener(
-					inputType = EditorInfo.TYPE_CLASS_TEXT or EditorInfo.TYPE_TEXT_VARIATION_PASSWORD,
-					hint = null,
-					validator = null,
-				),
-			)
-			pref.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
-				if (preference.text.isNullOrBlank()) {
-					getString(R.string.telegram_bot_token_summary)
-				} else {
-					PasswordSummaryProvider().provideSummary(preference)
-				}
-			}
-		}
-		findPreference<EditTextPreference>(AppSettings.KEY_BACKUP_TG_CHAT)?.summaryProvider =
-			EditTextFallbackSummaryProvider(R.string.telegram_chat_id_summary)
-		updateTelegramPreferences()
+
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -72,9 +51,7 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 		viewModel.lastBackupDate.observe(viewLifecycleOwner, ::bindLastBackupInfo)
 		viewModel.backupsDirectory.observe(viewLifecycleOwner, ::bindOutputSummary)
 		viewModel.onError.observeEvent(viewLifecycleOwner, SnackbarErrorObserver(listView, this))
-		viewModel.isTelegramCheckLoading.observe(viewLifecycleOwner) {
-			updateTelegramPreferences()
-		}
+
 	}
 
 	override fun onDestroyView() {
@@ -85,12 +62,6 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 	override fun onPreferenceTreeClick(preference: Preference): Boolean {
 		val result = when (preference.key) {
 			AppSettings.KEY_BACKUP_PERIODICAL_OUTPUT -> outputSelectCall.tryLaunch(null)
-			AppSettings.KEY_BACKUP_TG_OPEN -> telegramBackupUploader.openBotInApp(router)
-			AppSettings.KEY_BACKUP_TG_TEST -> {
-				viewModel.checkTelegram()
-				true
-			}
-
 			else -> return super.onPreferenceTreeClick(preference)
 		}
 		if (!result) {
@@ -109,13 +80,6 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 	}
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-		when (key) {
-			AppSettings.KEY_BACKUP_TG_TOKEN,
-			AppSettings.KEY_BACKUP_TG_ENABLED,
-			AppSettings.KEY_BACKUP_TG_CHAT,
-			AppSettings.KEY_BACKUP_PERIODICAL_ENABLED,
-			-> updateTelegramPreferences()
-		}
 	}
 
 	private fun bindOutputSummary(path: String?) {
@@ -143,9 +107,5 @@ class PeriodicalBackupSettingsFragment : BasePreferenceFragment(R.string.periodi
 		preference.isVisible = lastBackupDate != null
 	}
 
-	private fun updateTelegramPreferences() {
-		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_OPEN)?.isVisible = settings.backupTelegramBotToken == null
-		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_TEST)?.isVisible = viewModel.isTelegramAvailable
-		findPreference<Preference>(AppSettings.KEY_BACKUP_TG_TEST)?.isEnabled = !viewModel.isTelegramCheckLoading.value
-	}
+
 }

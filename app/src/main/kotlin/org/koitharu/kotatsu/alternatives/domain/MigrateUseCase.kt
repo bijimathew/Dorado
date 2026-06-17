@@ -19,9 +19,6 @@ import org.koitharu.kotatsu.list.domain.ReadingProgress.Companion.PROGRESS_NONE
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
-import org.koitharu.kotatsu.scrobbling.common.domain.Scrobbler
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingStatus
-import org.koitharu.kotatsu.scrobbling.common.domain.tryScrobble
 import org.koitharu.kotatsu.tracker.data.TrackEntity
 import javax.inject.Inject
 
@@ -32,7 +29,6 @@ constructor(
 	private val mangaDataRepository: MangaDataRepository,
 	private val database: MangaDatabase,
 	private val progressUpdateUseCase: ProgressUpdateUseCase,
-	private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
 ) {
 	suspend operator fun invoke(
 		oldManga: Manga,
@@ -113,39 +109,7 @@ constructor(
 			}
 			MangaIdentityMerge.mergeManga(database.openHelper.writableDatabase, oldDetails.id, newDetails.id)
 		}
-		// Scrobbling runs outside the DB transaction: each scrobbler hits the network and the
-		// transaction shouldn't stay open for the whole thing. Each scrobbler runs in parallel so
-		// one slow service doesn't block the others, and a failure in one doesn't break the migration
-		// or stop the rest.
-		val scrobblerWork = scrobblers.filter { it.isEnabled }.mapNotNull { scrobbler ->
-			val prevInfo = scrobbler.getScrobblingInfoOrNull(oldDetails.id) ?: return@mapNotNull null
-			scrobbler to prevInfo
-		}
-		if (scrobblerWork.isNotEmpty()) {
-			coroutineScope {
-				scrobblerWork.map { (scrobbler, prevInfo) ->
-					async {
-						runCatchingCancellable {
-							scrobbler.unregisterScrobbling(oldDetails.id)
-							scrobbler.linkManga(newDetails.id, prevInfo.targetId)
-							scrobbler.updateScrobblingInfo(
-								mangaId = newDetails.id,
-								rating = prevInfo.rating,
-								status = prevInfo.status ?: when {
-									newHistory == null -> ScrobblingStatus.PLANNED
-									newHistory?.percent == 1f -> ScrobblingStatus.COMPLETED
-									else -> ScrobblingStatus.READING
-								},
-								comment = prevInfo.comment,
-							)
-							newHistory?.let { h ->
-								scrobbler.tryScrobble(newDetails, h.chapterId)
-							}
-						}
-					}
-				}.awaitAll()
-			}
-		}
+
 		progressUpdateUseCase(newDetails)
 		return newDetails
 	}

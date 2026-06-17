@@ -12,9 +12,6 @@ import okhttp3.internal.http2.StreamResetException
 import okio.FileNotFoundException
 import okio.IOException
 import okio.ProtocolException
-import org.acra.ACRA
-import org.acra.ktx.sendSilentlyWithAcra
-import org.acra.ktx.sendWithAcra
 import org.jsoup.HttpStatusException
 import org.koitharu.kotatsu.BuildConfig
 import org.koitharu.kotatsu.R
@@ -46,7 +43,6 @@ import org.koitharu.kotatsu.parsers.exception.NotFoundException
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.exception.TooManyRequestExceptions
 import org.koitharu.kotatsu.parsers.util.ifNullOrEmpty
-import org.koitharu.kotatsu.scrobbling.common.domain.ScrobblerAuthRequiredException
 import java.io.File
 import java.net.ConnectException
 import java.net.HttpURLConnection
@@ -70,11 +66,6 @@ private fun Throwable.getDisplayMessageOrNull(resources: Resources): String? = w
     is CancellationException -> cause?.getDisplayMessageOrNull(resources) ?: message
     is CaughtException -> cause.getDisplayMessageOrNull(resources)
     is WrapperIOException -> cause.getDisplayMessageOrNull(resources)
-    is ScrobblerAuthRequiredException -> resources.getString(
-        R.string.scrobbler_auth_required,
-        resources.getString(scrobbler.titleResId),
-    )
-
     is AuthRequiredException -> cause?.message?.takeIf { it.isNotBlank() }
         ?: resources.getString(R.string.auth_required)
     is InteractiveActionRequiredException -> resources.getString(R.string.additional_action_required)
@@ -234,15 +225,6 @@ fun Throwable.isNetworkError(): Boolean {
 }
 
 fun Throwable.report(silent: Boolean = false) {
-    if (!ACRA.isInitialised) {
-        return
-    }
-    val exception = CaughtException(this)
-    if (!silent) {
-        exception.sendWithAcra()
-    } else if (!BuildConfig.DEBUG) {
-        exception.sendSilentlyWithAcra()
-    }
 }
 
 fun Throwable.isWebViewUnavailable(): Boolean {

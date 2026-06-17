@@ -26,7 +26,7 @@ import org.koitharu.kotatsu.backups.data.model.CategoryBackup
 import org.koitharu.kotatsu.backups.data.model.FavouriteBackup
 import org.koitharu.kotatsu.backups.data.model.HistoryBackup
 import org.koitharu.kotatsu.backups.data.model.MangaBackup
-import org.koitharu.kotatsu.backups.data.model.ScrobblingBackup
+
 import org.koitharu.kotatsu.backups.data.model.SourceBackup
 import org.koitharu.kotatsu.backups.data.model.StatisticBackup
 import org.koitharu.kotatsu.backups.domain.BackupSection
@@ -118,11 +118,7 @@ class BackupRepository @Inject constructor(
                     serializer = serializer(),
                 )
 
-                BackupSection.SCROBBLING -> output.writeJsonArray(
-                    section = BackupSection.SCROBBLING,
-                    data = database.getScrobblingDao().dumpEnabled().map { ScrobblingBackup(it) },
-                    serializer = serializer(),
-                )
+
 
                 BackupSection.STATS -> output.writeJsonArray(
                     section = BackupSection.STATS,
@@ -196,9 +192,7 @@ class BackupRepository @Inject constructor(
                         getSourcesDao().upsert(it.toEntity())
                     }
 
-                    BackupSection.SCROBBLING -> input.readJsonArray<ScrobblingBackup>(serializer()).restoreToDb {
-                        getScrobblingDao().upsert(it.toEntity())
-                    }
+
 
                     BackupSection.STATS -> input.readJsonArray<StatisticBackup>(serializer()).restoreToDb {
                         getStatsDao().upsert(it.toEntity())
@@ -333,7 +327,7 @@ class BackupRepository @Inject constructor(
         BackupSection.SETTINGS,
         BackupSection.SETTINGS_READER_GRID,
         BackupSection.SOURCES,
-        BackupSection.SCROBBLING,
+
         BackupSection.SAVED_FILTERS,
         -> false
     }

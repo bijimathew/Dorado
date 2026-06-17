@@ -68,7 +68,6 @@ import org.koitharu.kotatsu.reader.domain.DetectReaderModeUseCase
 import org.koitharu.kotatsu.reader.domain.PageLoader
 import org.koitharu.kotatsu.reader.ui.config.ReaderSettings
 import org.koitharu.kotatsu.reader.ui.pager.ReaderUiState
-import org.koitharu.kotatsu.scrobbling.discord.ui.DiscordRpc
 import org.koitharu.kotatsu.stats.domain.StatsCollector
 import java.time.Instant
 import javax.inject.Inject
@@ -90,7 +89,6 @@ class ReaderViewModel @Inject constructor(
     private val historyUpdateUseCase: HistoryUpdateUseCase,
     private val detectReaderModeUseCase: DetectReaderModeUseCase,
     private val statsCollector: StatsCollector,
-    private val discordRpc: DiscordRpc,
     @LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
     interactor: DetailsInteractor,
     deleteLocalMangaUseCase: DeleteLocalMangaUseCase,
@@ -225,11 +223,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun onStop() {
-        discordRpc.clearRpc()
     }
 
     fun onIdle() {
-        discordRpc.setIdle()
     }
 
     fun switchMode(newMode: ReaderMode) {
@@ -568,7 +564,6 @@ class ReaderViewModel @Inject constructor(
         uiState.value = newState
         if (isIncognitoMode.value == false) {
             statsCollector.onStateChanged(m.id, state)
-            discordRpc.updateRpc(m.toManga(), newState)
         }
     }
 

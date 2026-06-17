@@ -19,8 +19,7 @@ import org.koitharu.kotatsu.local.data.LocalMangaRepository
 import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
-import org.koitharu.kotatsu.scrobbling.common.domain.Scrobbler
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingInfo
+
 import org.koitharu.kotatsu.tracker.domain.TrackingRepository
 import javax.inject.Inject
 
@@ -31,7 +30,6 @@ class DetailsInteractor @Inject constructor(
 	private val localMangaRepository: LocalMangaRepository,
 	private val trackingRepository: TrackingRepository,
 	private val settings: AppSettings,
-	private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
 ) {
 
 	fun observeFavourite(mangaId: Long): Flow<Set<FavouriteCategory>> {
@@ -49,13 +47,7 @@ class DetailsInteractor @Inject constructor(
 			}
 	}
 
-	fun observeScrobblingInfo(mangaId: Long): Flow<List<ScrobblingInfo>> {
-		return combine(
-			scrobblers.map { it.observeScrobblingInfo(mangaId) },
-		) { scrobblingInfo ->
-			scrobblingInfo.filterNotNull()
-		}
-	}
+
 
 	fun observeIncognitoMode(mangaFlow: Flow<Manga?>): Flow<TriStateOption> {
 		return mangaFlow

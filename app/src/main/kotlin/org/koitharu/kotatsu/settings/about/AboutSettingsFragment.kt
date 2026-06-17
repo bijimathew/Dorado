@@ -36,7 +36,6 @@ class AboutSettingsFragment : BasePreferenceFragment(R.string.about) {
 			isEnabled = VersionId(BuildConfig.VERSION_NAME).isStable
 			if (!isEnabled) isChecked = true
 		}
-		findPreference<Preference>(AppSettings.KEY_LINK_DISCORD)?.isEnabled = getString(R.string.url_discord).isHttpUrl()
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -72,12 +71,6 @@ class AboutSettingsFragment : BasePreferenceFragment(R.string.about) {
 				true
 			}
 
-			AppSettings.KEY_LINK_DISCORD -> {
-				if (getString(R.string.url_discord).isHttpUrl()) {
-					openLink(R.string.url_discord, preference.title)
-				}
-				true
-			}
 
 			else -> super.onPreferenceTreeClick(preference)
 		}

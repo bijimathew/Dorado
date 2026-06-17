@@ -60,7 +60,7 @@ import org.koitharu.kotatsu.core.util.ext.withArgs
 import org.koitharu.kotatsu.details.ui.DetailsActivity
 import org.koitharu.kotatsu.details.ui.pager.ChaptersPagesSheet
 import org.koitharu.kotatsu.details.ui.related.RelatedMangaActivity
-import org.koitharu.kotatsu.details.ui.scrobbling.ScrobblingInfoSheet
+
 import org.koitharu.kotatsu.download.ui.dialog.DownloadDialogFragment
 import org.koitharu.kotatsu.download.ui.list.DownloadsActivity
 import org.koitharu.kotatsu.favourites.ui.FavouritesActivity
@@ -89,9 +89,7 @@ import org.koitharu.kotatsu.parsers.util.isNullOrEmpty
 import org.koitharu.kotatsu.parsers.util.mapToArray
 import org.koitharu.kotatsu.reader.ui.colorfilter.ColorFilterConfigActivity
 import org.koitharu.kotatsu.reader.ui.config.ReaderConfigSheet
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblerService
-import org.koitharu.kotatsu.scrobbling.common.ui.config.ScrobblerConfigActivity
-import org.koitharu.kotatsu.scrobbling.common.ui.selector.ScrobblingSelectorSheet
+
 import org.koitharu.kotatsu.search.domain.SearchKind
 import org.koitharu.kotatsu.search.ui.MangaListActivity
 import org.koitharu.kotatsu.search.ui.multi.SearchActivity
@@ -305,18 +303,10 @@ class AppRouter private constructor(
         startActivity(sourcesSettingsIntent(contextOrNull() ?: return))
     }
 
-    fun openDiscordSettings() {
-        startActivity(discordSettingsIntent(contextOrNull() ?: return))
-    }
 
     fun openReaderTapGridSettings() = startActivity(ReaderTapGridConfigActivity::class.java)
 
-    fun openScrobblerSettings(scrobbler: ScrobblerService) {
-        startActivity(
-            Intent(contextOrNull() ?: return, ScrobblerConfigActivity::class.java)
-                .putExtra(KEY_ID, scrobbler.id),
-        )
-    }
+
 
     fun openSourceAuth(source: MangaSource) {
         startActivity(sourceAuthIntent(contextOrNull() ?: return, source))
@@ -538,20 +528,7 @@ class AppRouter private constructor(
         }.showDistinct()
     }
 
-    fun showScrobblingSelectorSheet(manga: Manga, scrobblerService: ScrobblerService?) {
-        ScrobblingSelectorSheet().withArgs(2) {
-            putParcelable(KEY_MANGA, ParcelableManga(manga))
-            if (scrobblerService != null) {
-                putInt(KEY_ID, scrobblerService.id)
-            }
-        }.show()
-    }
 
-    fun showScrobblingInfoSheet(index: Int) {
-        ScrobblingInfoSheet().withArgs(1) {
-            putInt(KEY_INDEX, index)
-        }.showDistinct()
-    }
 
     fun showTrackerCategoriesConfigSheet() {
         TrackerCategoriesConfigSheet().showDistinct()
@@ -788,9 +765,6 @@ class AppRouter private constructor(
             Intent(context, SettingsActivity::class.java)
                 .setAction(ACTION_PERIODIC_BACKUP)
 
-        fun discordSettingsIntent(context: Context) =
-            Intent(context, SettingsActivity::class.java)
-                .setAction(ACTION_MANAGE_DISCORD)
 
         fun proxySettingsIntent(context: Context) =
             Intent(context, SettingsActivity::class.java)
@@ -876,7 +850,7 @@ class AppRouter private constructor(
         const val ACTION_READER = "${BuildConfig.APPLICATION_ID}.action.MANAGE_READER_SETTINGS"
         const val ACTION_SOURCE = "${BuildConfig.APPLICATION_ID}.action.MANAGE_SOURCE_SETTINGS"
         const val ACTION_SOURCES = "${BuildConfig.APPLICATION_ID}.action.MANAGE_SOURCES"
-        const val ACTION_MANAGE_DISCORD = "${BuildConfig.APPLICATION_ID}.action.MANAGE_DISCORD"
+
         const val ACTION_SUGGESTIONS = "${BuildConfig.APPLICATION_ID}.action.MANAGE_SUGGESTIONS"
         const val ACTION_TRACKER = "${BuildConfig.APPLICATION_ID}.action.MANAGE_TRACKER"
         const val ACTION_PERIODIC_BACKUP = "${BuildConfig.APPLICATION_ID}.action.MANAGE_PERIODIC_BACKUP"

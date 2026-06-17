@@ -51,9 +51,7 @@ import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.util.findById
 import org.koitharu.kotatsu.parsers.util.runCatchingCancellable
 import org.koitharu.kotatsu.reader.ui.ReaderState
-import org.koitharu.kotatsu.scrobbling.common.domain.Scrobbler
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingInfo
-import org.koitharu.kotatsu.scrobbling.common.domain.model.ScrobblingStatus
+
 import org.koitharu.kotatsu.stats.data.StatsRepository
 import javax.inject.Inject
 
@@ -62,7 +60,6 @@ class DetailsViewModel @Inject constructor(
 	private val historyRepository: HistoryRepository,
 	bookmarksRepository: BookmarksRepository,
 	settings: AppSettings,
-	private val scrobblers: Set<@JvmSuppressWildcards Scrobbler>,
 	@LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
 	downloadScheduler: DownloadWorker.Scheduler,
 	interactor: DetailsInteractor,
@@ -137,12 +134,7 @@ class DetailsViewModel @Inject constructor(
 			}
 		}.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.WhileSubscribed(5000), 0L)
 
-	val isScrobblingAvailable: Boolean
-		get() = scrobblers.any { it.isEnabled }
 
-	val scrobblingInfo: StateFlow<List<ScrobblingInfo>> = interactor.observeScrobblingInfo(mangaId)
-		.withErrorHandling()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Eagerly, emptyList())
 
 	val relatedManga: StateFlow<List<MangaListModel>> = manga.mapLatest {
 		if (it != null && settings.isRelatedMangaEnabled) {
@@ -209,26 +201,7 @@ class DetailsViewModel @Inject constructor(
 		loadingJob = doLoad(force = true)
 	}
 
-	fun updateScrobbling(index: Int, rating: Float, status: ScrobblingStatus?) {
-		val scrobbler = getScrobbler(index) ?: return
-		launchJob(Dispatchers.Default) {
-			scrobbler.updateScrobblingInfo(
-				mangaId = mangaId,
-				rating = rating,
-				status = status,
-				comment = null,
-			)
-		}
-	}
 
-	fun unregisterScrobbling(index: Int) {
-		val scrobbler = getScrobbler(index) ?: return
-		launchJob(Dispatchers.Default) {
-			scrobbler.unregisterScrobbling(
-				mangaId = mangaId,
-			)
-		}
-	}
 
 	fun removeFromHistory() {
 		launchJob(Dispatchers.Default) {
@@ -254,16 +227,5 @@ class DetailsViewModel @Inject constructor(
 			}
 	}
 
-	private fun getScrobbler(index: Int): Scrobbler? {
-		val info = scrobblingInfo.value.getOrNull(index)
-		val scrobbler = if (info != null) {
-			scrobblers.find { it.scrobblerService == info.scrobbler && it.isEnabled }
-		} else {
-			null
-		}
-		if (scrobbler == null) {
-			errorEvent.call(IllegalStateException("Scrobbler [$index] is not available"))
-		}
-		return scrobbler
-	}
+
 }
