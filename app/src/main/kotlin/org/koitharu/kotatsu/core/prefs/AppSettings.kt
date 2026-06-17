@@ -209,9 +209,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	val isTrackerEnabled: Boolean
 		get() = prefs.getBoolean(KEY_TRACKER_ENABLED, true)
 
-	val isTrackerWifiOnly: Boolean
-		get() = prefs.getBoolean(KEY_TRACKER_WIFI_ONLY, false)
-
 	val trackerFrequencyFactor: Float
 		get() = prefs.getString(KEY_TRACKER_FREQUENCY, null)?.toFloatOrNull() ?: 1f
 
@@ -381,8 +378,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		set(value) = prefs.edit { putBoolean(KEY_SOURCES_ENABLED_ALL, value) }
 
 	var isBrokenSourcesHidden: Boolean
-		get() = prefs.getBoolean(KEY_SOURCES_HIDE_BROKEN, false)
-		set(value) = prefs.edit { putBoolean(KEY_SOURCES_HIDE_BROKEN, value) }
+		get() = true
+		set(_) {}
 
 	val isPagesNumbersEnabled: Boolean
 		get() = prefs.getBoolean(KEY_PAGES_NUMBERS, false)
@@ -420,8 +417,8 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		}
 
 	var allowDownloadOnMeteredNetwork: TriStateOption
-		get() = prefs.getEnumValue(KEY_DOWNLOADS_METERED_NETWORK, TriStateOption.ASK)
-		set(value) = prefs.edit { putEnumValue(KEY_DOWNLOADS_METERED_NETWORK, value) }
+		get() = TriStateOption.ENABLED
+		set(_) {}
 
 	val preferredDownloadFormat: DownloadFormat
 		get() = prefs.getEnumValue(KEY_DOWNLOADS_FORMAT, DownloadFormat.AUTOMATIC)
@@ -429,9 +426,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 	var isSuggestionsEnabled: Boolean
 		get() = prefs.getBoolean(KEY_SUGGESTIONS, false)
 		set(value) = prefs.edit { putBoolean(KEY_SUGGESTIONS, value) }
-
-	val isSuggestionsWiFiOnly: Boolean
-		get() = prefs.getBoolean(KEY_SUGGESTIONS_WIFI_ONLY, false)
 
 	val isSuggestionsExcludeNsfw: Boolean
 		get() = prefs.getBoolean(KEY_SUGGESTIONS_EXCLUDE_NSFW, false)
@@ -789,7 +783,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_READER_VOLUME_BUTTONS = "reader_volume_buttons"
 		const val KEY_READER_ORIENTATION = "reader_orientation"
 		const val KEY_TRACKER_ENABLED = "tracker_enabled"
-		const val KEY_TRACKER_WIFI_ONLY = "tracker_wifi"
 		const val KEY_TRACKER_FREQUENCY = "tracker_freq"
 		const val KEY_TRACK_SOURCES = "track_sources"
 		const val KEY_TRACK_CATEGORIES = "track_categories"
@@ -834,7 +827,6 @@ class AppSettings @Inject constructor(@ApplicationContext context: Context) {
 		const val KEY_SCREENSHOTS_POLICY = "screenshots_policy"
 		const val KEY_PAGES_PRELOAD = "pages_preload"
 		const val KEY_SUGGESTIONS = "suggestions"
-		const val KEY_SUGGESTIONS_WIFI_ONLY = "suggestions_wifi"
 		const val KEY_SUGGESTIONS_EXCLUDE_NSFW = "suggestions_exclude_nsfw"
 		const val KEY_SUGGESTIONS_EXCLUDE_TAGS = "suggestions_exclude_tags"
 		const val KEY_SUGGESTIONS_DISABLED_SOURCES = "suggestions_disabled_sources"

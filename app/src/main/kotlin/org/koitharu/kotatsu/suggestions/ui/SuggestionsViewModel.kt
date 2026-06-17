@@ -3,6 +3,7 @@ package org.koitharu.kotatsu.suggestions.ui
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -21,12 +22,11 @@ import org.koitharu.kotatsu.list.ui.MangaListViewModel
 import org.koitharu.kotatsu.list.ui.model.EmptyState
 import org.koitharu.kotatsu.list.ui.model.LoadingState
 import org.koitharu.kotatsu.list.ui.model.toErrorState
+import org.koitharu.kotatsu.local.data.LocalStorageChanges
+import org.koitharu.kotatsu.local.domain.model.LocalManga
 import org.koitharu.kotatsu.suggestions.domain.SuggestionRepository
 import org.koitharu.kotatsu.suggestions.domain.SuggestionsListQuickFilter
 import javax.inject.Inject
-import org.koitharu.kotatsu.local.data.LocalStorageChanges
-import org.koitharu.kotatsu.local.domain.model.LocalManga
-import kotlinx.coroutines.flow.SharedFlow
 
 @HiltViewModel
 class SuggestionsViewModel @Inject constructor(
@@ -34,7 +34,6 @@ class SuggestionsViewModel @Inject constructor(
 	settings: AppSettings,
 	private val mangaListMapper: MangaListMapper,
 	private val quickFilter: SuggestionsListQuickFilter,
-	private val suggestionsScheduler: SuggestionsWorker.Scheduler,
 	mangaDataRepository: MangaDataRepository,
 	@LocalStorageChanges localStorageChanges: SharedFlow<LocalManga?>,
 ) : MangaListViewModel(settings, mangaDataRepository, localStorageChanges), QuickFilterListener by quickFilter {
@@ -87,8 +86,6 @@ class SuggestionsViewModel @Inject constructor(
 	override fun onRetry() = Unit
 
 	fun updateSuggestions() {
-		launchJob(Dispatchers.Default) {
-			suggestionsScheduler.startNow()
-		}
+		// No-op
 	}
 }

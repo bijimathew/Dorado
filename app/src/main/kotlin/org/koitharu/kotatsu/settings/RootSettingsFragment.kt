@@ -29,7 +29,7 @@ class RootSettingsFragment : BasePreferenceFragment(0) {
 		bindPreferenceSummary("reader", R.string.read_mode, R.string.scale_mode, R.string.switch_pages)
 		bindPreferenceSummary("network", R.string.storage_usage, R.string.proxy, R.string.prefetch_content)
 		bindPreferenceSummary("userdata", R.string.create_or_restore_backup, R.string.periodic_backups)
-		bindPreferenceSummary("downloads", R.string.manga_save_location, R.string.downloads_wifi_only)
+		bindPreferenceSummary("downloads", R.string.manga_save_location)
 		bindPreferenceSummary("tracker", R.string.track_sources, R.string.notifications_settings)
 		bindPreferenceSummary("services", R.string.related_manga, R.string.reading_stats)
 		findPreference<Preference>("about")?.summary = getString(R.string.app_version, BuildConfig.VERSION_NAME)

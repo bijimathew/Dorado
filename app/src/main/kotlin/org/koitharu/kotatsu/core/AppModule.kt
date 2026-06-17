@@ -130,6 +130,21 @@ interface AppModule {
 				.allowRgb565(context.isLowRamDevice())
 				.eventListener(captchaHandler)
 				.components {
+					add(coil3.intercept.Interceptor { chain ->
+						val request = chain.request
+						val data = request.data
+						val manga = request.extras[org.koitharu.kotatsu.core.util.ext.mangaKey]
+						val isCover = data is String && (manga != null || request.extras[org.koitharu.kotatsu.core.util.ext.mangaSourceKey] != null)
+						if (isCover) {
+							val shouldCache = manga != null && manga.id != 0L
+							if (!shouldCache) {
+								return@Interceptor chain.withRequest(
+									request.newBuilder().diskCachePolicy(coil3.request.CachePolicy.DISABLED).build()
+								).proceed()
+							}
+						}
+						chain.proceed()
+					})
 					add(
 						OkHttpNetworkFetcherFactory(
 							callFactory = okHttpClientLazy::value,

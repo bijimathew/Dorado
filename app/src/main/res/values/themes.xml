@@ -166,4 +166,8 @@
 		<item name="android:colorBackground">@color/kotatsu_background</item>
 		<item name="android:panelColorBackground">@color/kotatsu_primaryContainer</item>
 	</style>
+
+	<style name="Theme.Kotatsu.Splash" parent="Theme.Kotatsu">
+		<item name="android:windowBackground">@drawable/splash_background</item>
+	</style>
 </resources>

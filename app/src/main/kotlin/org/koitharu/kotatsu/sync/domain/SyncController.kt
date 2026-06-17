@@ -47,12 +47,7 @@ class SyncController @Inject constructor(
 	private val defaultGcPeriod = TimeUnit.DAYS.toMillis(2) // gc period if sync disabled
 
 	override fun onInvalidated(tables: Set<String>) {
-		val favourites = (TABLE_FAVOURITES in tables || TABLE_FAVOURITE_CATEGORIES in tables)
-			&& !isSyncActiveOrPending(authorityFavourites)
-		val history = TABLE_HISTORY in tables && !isSyncActiveOrPending(authorityHistory)
-		if (favourites || history) {
-			requestSync(favourites, history)
-		}
+		// Sync is completely disabled to prevent battery drain
 	}
 
 	fun addAccount(activity: Activity, callback: (account: Account?) -> Unit) {
@@ -131,34 +126,7 @@ class SyncController @Inject constructor(
 	}
 
 	private suspend fun requestSyncImpl(favourites: Boolean, history: Boolean) = mutex.withLock {
-		if (!favourites && !history) {
-			return
-		}
-		val db = dbProvider.get()
-		val account = peekAccount()
-		if (account == null || !ContentResolver.getMasterSyncAutomatically()) {
-			db.gc(favourites, history)
-			return
-		}
-		var gcHistory = false
-		var gcFavourites = false
-		if (favourites) {
-			if (ContentResolver.getSyncAutomatically(account, authorityFavourites)) {
-				ContentResolver.requestSync(account, authorityFavourites, Bundle.EMPTY)
-			} else {
-				gcFavourites = true
-			}
-		}
-		if (history) {
-			if (ContentResolver.getSyncAutomatically(account, authorityHistory)) {
-				ContentResolver.requestSync(account, authorityHistory, Bundle.EMPTY)
-			} else {
-				gcHistory = true
-			}
-		}
-		if (gcHistory || gcFavourites) {
-			db.gc(gcFavourites, gcHistory)
-		}
+		// No-op to prevent battery drain
 	}
 
 	private fun peekAccount(): Account? {

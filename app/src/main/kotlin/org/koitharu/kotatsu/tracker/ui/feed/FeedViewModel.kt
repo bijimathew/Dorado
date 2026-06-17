@@ -38,7 +38,6 @@ import org.koitharu.kotatsu.tracker.domain.UpdatesListQuickFilter
 import org.koitharu.kotatsu.tracker.domain.model.TrackingLogItem
 import org.koitharu.kotatsu.tracker.ui.feed.model.FeedItem
 import org.koitharu.kotatsu.tracker.ui.feed.model.UpdatedMangaHeader
-import org.koitharu.kotatsu.tracker.work.TrackWorker
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
@@ -48,7 +47,6 @@ private const val PAGE_SIZE = 20
 class FeedViewModel @Inject constructor(
 	private val settings: AppSettings,
 	private val repository: TrackingRepository,
-	private val scheduler: TrackWorker.Scheduler,
 	private val mangaListMapper: MangaListMapper,
 	private val quickFilter: UpdatesListQuickFilter,
 ) : BaseViewModel(), QuickFilterListener by quickFilter {
@@ -56,8 +54,8 @@ class FeedViewModel @Inject constructor(
 	private val limit = MutableStateFlow(PAGE_SIZE)
 	private val isReady = AtomicBoolean(false)
 
-	val isRunning = scheduler.observeIsRunning()
-		.stateIn(viewModelScope + Dispatchers.Default, SharingStarted.Lazily, false)
+	val isRunning = flowOf(false)
+		.stateIn(viewModelScope, SharingStarted.Lazily, false)
 
 	val isHeaderEnabled = settings.observeAsStateFlow(
 		scope = viewModelScope + Dispatchers.Default,
@@ -122,7 +120,7 @@ class FeedViewModel @Inject constructor(
 	}
 
 	fun update() {
-		scheduler.startNow()
+		// No-op
 	}
 
 	fun setHeaderEnabled(value: Boolean) {

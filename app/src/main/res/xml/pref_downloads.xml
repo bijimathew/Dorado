@@ -20,12 +20,6 @@
 		android:title="@string/preferred_download_format"
 		app:useSimpleSummaryProvider="true" />
 
-	<ListPreference
-		android:entries="@array/metered_network_options"
-		android:key="downloads_metered_network"
-		android:title="@string/download_over_cellular"
-		app:useSimpleSummaryProvider="true" />
-
 	<Preference
 		android:icon="@drawable/ic_info_outline"
 		android:key="tracker_notifications_info"

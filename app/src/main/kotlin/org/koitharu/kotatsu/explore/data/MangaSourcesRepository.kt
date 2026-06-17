@@ -77,10 +77,19 @@ class MangaSourcesRepository @Inject constructor(
 	private val dao: MangaSourcesDao
 		get() = db.getSourcesDao()
 
+	private val HTTP_SOURCES_NORMALIZED = setOf(
+		"MANGABALL", "BATCAVE", "COMIX", "MANGAGO", "STONESCAPE", "YAOIMANGAONLINE",
+		"ORTEGASCANS", "LIKEMANGA", "MADTHEME", "ALUCARDSCANS", "MANGOTHEME",
+		"OTAKUSANCTUARY", "GEASSCOMICS", "MANHASTRO", "YOMUMANGAS", "TOMILOLIB",
+		"UZAYMANGA", "HENTAI18VN", "MEHENTAIVN"
+	)
+
 	val allMangaSources: Set<MangaParserSource> = Collections.unmodifiableSet(
-		EnumSet.noneOf<MangaParserSource>(MangaParserSource::class.java).also {
-            MangaParserSource.entries.filterNotTo(it, MangaParserSource::isBroken)
-        }
+		EnumSet.noneOf<MangaParserSource>(MangaParserSource::class.java).also { set ->
+			MangaParserSource.entries.filterNotTo(set) { source ->
+				source.isBroken || HTTP_SOURCES_NORMALIZED.contains(source.name.replace("_", "").uppercase())
+			}
+		}
 	)
 
 	suspend fun getEnabledSources(): List<MangaSource> {

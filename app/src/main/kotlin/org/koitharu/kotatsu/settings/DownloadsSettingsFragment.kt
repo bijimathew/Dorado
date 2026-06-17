@@ -18,15 +18,12 @@ import org.koitharu.kotatsu.core.nav.router
 import org.koitharu.kotatsu.core.os.OpenDocumentTreeHelper
 import org.koitharu.kotatsu.core.prefs.AppSettings
 import org.koitharu.kotatsu.core.prefs.DownloadFormat
-import org.koitharu.kotatsu.core.prefs.TriStateOption
 import org.koitharu.kotatsu.core.ui.BasePreferenceFragment
 import org.koitharu.kotatsu.core.util.ext.getQuantityStringSafe
-import org.koitharu.kotatsu.core.util.ext.printStackTraceDebug
 import org.koitharu.kotatsu.core.util.ext.resolveFile
 import org.koitharu.kotatsu.core.util.ext.setDefaultValueCompat
 import org.koitharu.kotatsu.core.util.ext.tryLaunch
 import org.koitharu.kotatsu.core.util.ext.viewLifecycleScope
-import org.koitharu.kotatsu.download.ui.worker.DownloadWorker
 import org.koitharu.kotatsu.local.data.LocalStorageManager
 import org.koitharu.kotatsu.parsers.util.names
 import org.koitharu.kotatsu.settings.utils.DozeHelper
@@ -42,9 +39,6 @@ class DownloadsSettingsFragment :
 	@Inject
 	lateinit var storageManager: LocalStorageManager
 
-	@Inject
-	lateinit var downloadsScheduler: DownloadWorker.Scheduler
-
 	private val pickFileTreeLauncher = OpenDocumentTreeHelper(this) {
 		if (it != null) onDirectoryPicked(it)
 	}
@@ -54,10 +48,6 @@ class DownloadsSettingsFragment :
 		findPreference<ListPreference>(AppSettings.KEY_DOWNLOADS_FORMAT)?.run {
 			entryValues = DownloadFormat.entries.names()
 			setDefaultValueCompat(DownloadFormat.AUTOMATIC.name)
-		}
-		findPreference<ListPreference>(AppSettings.KEY_DOWNLOADS_METERED_NETWORK)?.run {
-			entryValues = TriStateOption.entries.names()
-			setDefaultValueCompat(TriStateOption.ASK.name)
 		}
 		dozeHelper.updatePreference()
 	}
@@ -83,10 +73,6 @@ class DownloadsSettingsFragment :
 
 			AppSettings.KEY_LOCAL_MANGA_DIRS -> {
 				findPreference<Preference>(key)?.bindDirectoriesCount()
-			}
-
-			AppSettings.KEY_DOWNLOADS_METERED_NETWORK -> {
-				updateDownloadsConstraints()
 			}
 
 			AppSettings.KEY_PAGES_SAVE_DIR -> {
@@ -157,27 +143,6 @@ class DownloadsSettingsFragment :
 			}
 			summary = df?.getDisplayPath(this@bindPagesDirectory.context)
 				?: this@bindPagesDirectory.context.getString(androidx.preference.R.string.not_set)
-		}
-	}
-
-	private fun updateDownloadsConstraints() {
-		val preference = findPreference<Preference>(AppSettings.KEY_DOWNLOADS_METERED_NETWORK)
-		viewLifecycleScope.launch {
-			try {
-				preference?.isEnabled = false
-				withContext(Dispatchers.Default) {
-					val option = when (settings.allowDownloadOnMeteredNetwork) {
-						TriStateOption.ENABLED -> true
-						TriStateOption.ASK -> return@withContext
-						TriStateOption.DISABLED -> false
-					}
-					downloadsScheduler.updateConstraints(option)
-				}
-			} catch (e: Exception) {
-				e.printStackTraceDebug()
-			} finally {
-				preference?.isEnabled = true
-			}
 		}
 	}
 

@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 
 class CacheLimitInterceptor : Interceptor {
 
-	private val defaultMaxAge = TimeUnit.HOURS.toSeconds(1)
+	private val defaultMaxAge = TimeUnit.HOURS.toSeconds(12)
 	private val defaultCacheControl = CacheControl.Builder()
 		.maxAge(defaultMaxAge.toInt(), TimeUnit.SECONDS)
 		.build()
