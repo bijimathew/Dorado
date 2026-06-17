@@ -9,6 +9,96 @@
 
 ### Main Features
 
+# Changes From Original Kaisoku Fork
+
+This fork includes several security, privacy, and transparency improvements compared to the original repository.
+
+## Security & Privacy Modifications
+
+After reviewing the source code, several privacy and security concerns were identified and addressed.
+
+### 1. Removed Default Telegram Backup Bot
+
+**Original Behavior**
+
+The Telegram backup feature contained a hardcoded default bot token. Users enabling Telegram backups without configuring their own bot credentials could inadvertently upload backup archives containing application data to a third-party Telegram bot.
+
+**Changes Made**
+
+* Removed the hardcoded Telegram bot token.
+* Telegram backups now require explicit user configuration.
+* No backup data is transmitted unless the user provides their own credentials.
+
+### 2. Improved Network Security
+
+**Original Behavior**
+
+The application allowed cleartext (HTTP) network traffic through the Android network security configuration.
+
+**Potential Risk**
+
+Traffic sent over HTTP can be observed or modified by network operators, public Wi-Fi providers, or other intermediaries.
+
+**Changes Made**
+
+* Disabled unnecessary cleartext traffic where possible.
+* Encouraged HTTPS-only communication.
+* Added warnings for sources that do not support encrypted connections.
+
+### 3. Disabled Discord Rich Presence Integration
+
+**Original Behavior**
+
+Discord Rich Presence functionality relied on user-provided Discord account tokens through KizzyRPC integration.
+
+**Potential Risk**
+
+Using personal Discord tokens may violate Discord's Terms of Service and exposes reading activity through Discord presence features.
+
+**Changes Made**
+
+* Removed/disabled Discord Rich Presence integration.
+* Eliminated the need for users to provide Discord account tokens.
+
+### 4. Reduced Third-Party Data Sharing
+
+**Original Behavior**
+
+The application supported optional integration with third-party tracking platforms such as MyAnimeList, AniList, Shikimori, and Kitsu.
+
+**Changes Made**
+
+* Tracking services remain strictly optional.
+* Documentation has been updated to clearly explain what information may be shared when users connect external tracking accounts.
+
+### 5. Removed Crash Reporting Infrastructure
+
+**Original Behavior**
+
+The project contained ACRA crash reporting components. Although crash submission was disabled by default, the infrastructure remained present.
+
+**Changes Made**
+
+* Removed crash reporting dependencies and related code.
+* No crash reports are transmitted to external servers.
+
+## Transparency Statement
+
+This fork prioritizes:
+
+* User privacy
+* Minimal data collection
+* Explicit user consent
+* Secure network communication
+* Removal of unnecessary third-party integrations
+
+Users are encouraged to review the source code and build the application themselves if additional verification is desired.
+
+## Disclaimer
+
+This project is an independent fork and is not affiliated with or endorsed by the original Kaisoku project or its contributors.
+
+
 <div align="left">
 
 * Online [manga catalogues](https://github.com/glitch-228/kaisoku-parsers) (with 1200+ manga sources)
