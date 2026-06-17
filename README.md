@@ -2,14 +2,32 @@
 > Vibecode-maintained Android manga reader with built-in online sources. No guarantee for full stability.
 
 ---
-
-<div align="center">
+<div align ="center">
 
 ![Android 6.0](https://img.shields.io/badge/android-6.0+-brightgreen) [![Sources count](https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fglitch-228%2Fkaisoku-parsers%2Frefs%2Fheads%2Fmaster%2F.github%2Fsummary.yaml&query=total&label=manga%20sources&color=%23E9321C)](https://github.com/glitch-228/kaisoku-parsers) [![License](https://img.shields.io/github/license/glitch-228/Kaisoku)](https://github.com/glitch-228/Kaisoku/blob/devel/LICENSE)
 
+</div>
+
+### 🌳 Project Lineage
+
+**Kotatsu → Kaisoku → Dorado**
+
+Dorado is a fork of Kaisoku, which itself originated as a fork of Kotatsu
+
+This project builds upon the work of both upstream projects while maintaining compatibility with the existing ecosystem while introducing additional privacy, security, and transparency improvements
+
+**Dorado adds:**
+
+- 🔒 Privacy Hardening
+- 🛡️ Security Improvements
+- 📖 Transparent Defaults
+
+
+<div align="center">
+
 ### Main Features
 
-<div>
+</div>
     
 **🔒 Security & Privacy Enhancements**
 
@@ -116,7 +134,7 @@ The project contained ACRA crash reporting components. Although crash submission
 This fork prioritizes:
 
 * User privacy
-* NO data collection
+* No data collection
 * Explicit user consent
 * Secure network communication
 * Removal of unnecessary third-party integrations
