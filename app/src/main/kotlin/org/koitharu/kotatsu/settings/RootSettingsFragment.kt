@@ -25,7 +25,6 @@ class RootSettingsFragment : BasePreferenceFragment(0) {
 
 	override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
 		addPreferencesFromResource(R.xml.pref_root)
-		addPreferencesFromResource(R.xml.pref_root_debug)
 		bindPreferenceSummary("appearance", R.string.theme, R.string.list_mode, R.string.language)
 		bindPreferenceSummary("reader", R.string.read_mode, R.string.scale_mode, R.string.switch_pages)
 		bindPreferenceSummary("network", R.string.storage_usage, R.string.proxy, R.string.prefetch_content)
