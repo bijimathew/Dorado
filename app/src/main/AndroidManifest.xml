@@ -91,7 +91,6 @@
 
 				<data android:scheme="http" />
 				<data android:scheme="https" />
-				<data android:host="kotatsu.app" />
 				<data android:path="/manga" />
 			</intent-filter>
 			<intent-filter>
@@ -100,10 +99,8 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
-				<data android:scheme="kaisoku" />
-				<data android:scheme="kotatsu" />
+				<data android:scheme="dorado" />
 				<data android:host="manga" />
-				<data android:host="kotatsu.app" />
 			</intent-filter>
 		</activity>
 		<activity
@@ -156,7 +153,7 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
-				<data android:scheme="kaisoku" />
+				<data android:scheme="dorado" />
 				<data android:scheme="kotatsu" />
 				<data android:host="about" />
 				<data android:host="sync-settings" />
@@ -269,7 +266,7 @@
 				<category android:name="android.intent.category.DEFAULT" />
 				<category android:name="android.intent.category.BROWSABLE" />
 
-				<data android:scheme="kaisoku" />
+				<data android:scheme="dorado" />
 				<data android:scheme="kotatsu" />
 				<data android:host="reset-password" />
 			</intent-filter>
@@ -289,7 +286,7 @@
 					<category android:name="android.intent.category.DEFAULT" />
 					<category android:name="android.intent.category.BROWSABLE" />
 
-					<data android:scheme="kaisoku" />
+					<data android:scheme="dorado" />
 					<data android:scheme="kotatsu" />
 					<data android:host="shikimori-auth" />
 					<data android:host="anilist-auth" />
@@ -346,7 +343,7 @@
 				<intent-filter>
 					<action android:name="android.intent.action.VIEW" />
 					<category android:name="android.intent.category.DEFAULT" />
-					<data android:scheme="kaisoku+kitsu" />
+					<data android:scheme="dorado+kitsu" />
 					<data android:scheme="kotatsu+kitsu" />
 				</intent-filter>
 			</activity>
@@ -423,39 +420,6 @@
 			android:name="org.koitharu.kotatsu.widget.recent.RecentWidgetService"
 			android:label="@string/recent_manga"
 			android:permission="android.permission.BIND_REMOTEVIEWS" />
-		<service
-			android:name="org.koitharu.kotatsu.sync.ui.SyncAuthenticatorService"
-			android:exported="true"
-			tools:ignore="ExportedService">
-			<intent-filter>
-				<action android:name="android.accounts.AccountAuthenticator" />
-			</intent-filter>
-			<meta-data
-				android:name="android.accounts.AccountAuthenticator"
-				android:resource="@xml/authenticator_sync" />
-		</service>
-		<service
-			android:name="org.koitharu.kotatsu.sync.ui.favourites.FavouritesSyncService"
-			android:exported="false"
-			android:label="@string/favourites">
-			<intent-filter>
-				<action android:name="android.content.SyncAdapter" />
-			</intent-filter>
-			<meta-data
-				android:name="android.content.SyncAdapter"
-				android:resource="@xml/sync_favourites" />
-		</service>
-		<service
-			android:name="org.koitharu.kotatsu.sync.ui.history.HistorySyncService"
-			android:exported="false"
-			android:label="@string/history">
-			<intent-filter>
-				<action android:name="android.content.SyncAdapter" />
-			</intent-filter>
-			<meta-data
-				android:name="android.content.SyncAdapter"
-				android:resource="@xml/sync_history" />
-		</service>
 		<service
 			android:name="org.koitharu.kotatsu.details.service.MangaPrefetchService"
 			android:exported="false"

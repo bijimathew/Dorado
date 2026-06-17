@@ -6,28 +6,13 @@ import android.os.Build
 import android.os.StrictMode
 import androidx.core.content.edit
 import androidx.fragment.app.strictmode.FragmentStrictMode
-import leakcanary.LeakCanary
 import org.koitharu.kotatsu.core.BaseApp
 
 class KotatsuApp : BaseApp() {
 
-	var isLeakCanaryEnabled: Boolean
-		get() = getDebugPreferences(this).getBoolean(KEY_LEAK_CANARY, true)
-		set(value) {
-			getDebugPreferences(this).edit { putBoolean(KEY_LEAK_CANARY, value) }
-			configureLeakCanary()
-		}
-
 	override fun attachBaseContext(base: Context) {
 		super.attachBaseContext(base)
 		enableStrictMode()
-		configureLeakCanary()
-	}
-
-	private fun configureLeakCanary() {
-		LeakCanary.config = LeakCanary.config.copy(
-			dumpHeap = isLeakCanaryEnabled,
-		)
 	}
 
 	private fun enableStrictMode() {

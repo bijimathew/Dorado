@@ -45,15 +45,7 @@ class WebViewExecutor @Inject constructor(
 	private var webViewCached: WeakReference<WebView>? = null
 	private val mutex = Mutex()
 
-	val defaultUserAgent: String? by lazy {
-		try {
-			WebSettings.getDefaultUserAgent(context)
-		} catch (e: AndroidRuntimeException) {
-			e.printStackTraceDebug()
-			// Probably WebView is not available
-			null
-		}
-	}
+	val defaultUserAgent: String = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
     suspend fun evaluateJs(
         baseUrl: String?,

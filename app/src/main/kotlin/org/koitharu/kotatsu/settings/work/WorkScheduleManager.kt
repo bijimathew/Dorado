@@ -21,48 +21,13 @@ class WorkScheduleManager @Inject constructor(
 ) : SharedPreferences.OnSharedPreferenceChangeListener {
 
 	override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-		when (key) {
-			AppSettings.KEY_TRACKER_ENABLED,
-			AppSettings.KEY_TRACKER_FREQUENCY,
-			AppSettings.KEY_TRACKER_WIFI_ONLY -> updateWorker(
-				scheduler = trackerScheduler,
-				isEnabled = settings.isTrackerEnabled,
-				force = key != AppSettings.KEY_TRACKER_ENABLED,
-			)
-
-			AppSettings.KEY_SUGGESTIONS,
-			AppSettings.KEY_SUGGESTIONS_WIFI_ONLY -> updateWorker(
-				scheduler = suggestionScheduler,
-				isEnabled = settings.isSuggestionsEnabled,
-				force = key != AppSettings.KEY_SUGGESTIONS,
-			)
-		}
+		// No-op
 	}
 
 	fun init() {
-		settings.subscribe(this)
 		processLifecycleScope.launch(Dispatchers.Default) {
-			updateWorkerImpl(trackerScheduler, settings.isTrackerEnabled, true) // always force due to adaptive interval
-			updateWorkerImpl(suggestionScheduler, settings.isSuggestionsEnabled, false)
-		}
-		processLifecycleScope.launch(Dispatchers.Default) {
-			trackerUnstuckMigrationProvider.get().runIfNeeded()
-		}
-	}
-
-	private fun updateWorker(scheduler: PeriodicWorkScheduler, isEnabled: Boolean, force: Boolean) {
-		processLifecycleScope.launch(Dispatchers.Default) {
-			updateWorkerImpl(scheduler, isEnabled, force)
-		}
-	}
-
-	private suspend fun updateWorkerImpl(scheduler: PeriodicWorkScheduler, isEnabled: Boolean, force: Boolean) {
-		if (force || scheduler.isScheduled() != isEnabled) {
-			if (isEnabled) {
-				scheduler.schedule()
-			} else {
-				scheduler.unschedule()
-			}
+			trackerScheduler.unschedule()
+			suggestionScheduler.unschedule()
 		}
 	}
 }

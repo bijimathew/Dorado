@@ -20,7 +20,7 @@
     <string name="search_on_s">%s-ൽ തിരയുക</string>
     <string name="_continue">തുടരുക</string>
     <string name="not_available">ലഭ്യമല്ല</string>
-    <string name="protect_application_summary">Kaisoku ആരംഭിക്കുമ്പോൾ പാസ്‌വേഡ് ചോദിക്കുക</string>
+    <string name="protect_application_summary">Dorado ആരംഭിക്കുമ്പോൾ പാസ്‌വേഡ് ചോദിക്കുക</string>
     <string name="repeat_password">പാസ്‌വേഡ് ആവർത്തിക്കുക</string>
     <string name="passwords_mismatch">പൊരുത്തപ്പെടാത്ത പാസ്‌വേഡുകൾ</string>
     <string name="password_length_hint">പാസ്‌വേഡിൽ കുറഞ്ഞത് നാലു അക്ഷരങ്ങൾ ഉണ്ടായിരിക്കണം</string>

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="url_github" translatable="false">https://github.com/glitch-228/Kaisoku</string>
+	<string name="url_github" translatable="false">https://github.com/bijimathew/Dorado</string>
 	<string name="url_discord" translatable="false">https://discord.gg/gSabQBGGnj</string>
 	<string name="url_telegram_web" translatable="false">https://t.me/KaisokuApp</string>
 	<string name="url_telegram" translatable="false">tg://resolve?domain=KaisokuApp</string>
 	<string name="url_weblate" translatable="false">https://hosted.weblate.org/engage/kotatsu</string>
-	<string name="url_user_manual" translatable="false">https://github.com/glitch-228/Kaisoku/blob/devel/README.md</string>
-	<string name="url_error_report" translatable="false">https://github.com/glitch-228/Kaisoku/issues/new/choose</string>
+	<string name="url_user_manual" translatable="false">https://github.com/bijimathew/Dorado/blob/main/README.md</string>
+	<string name="url_error_report" translatable="false">https://github.com/bijimathew/Dorado/issues/new/choose</string>
 	<string name="account_type_sync" translatable="false">io.github.glitch228.kaisoku.sync</string>
-	<string name="github_updates_repo" translatable="false">glitch-228/Kaisoku</string>
+	<string name="github_updates_repo" translatable="false">bijimathew/Dorado</string>
 	<string name="sync_authority_history" translatable="false">io.github.glitch228.kaisoku.history</string>
 	<string name="sync_authority_favourites" translatable="false">io.github.glitch228.kaisoku.favourites</string>
 	<string name="app_icon_url" translatable="false">https://raw.githubusercontent.com/glitch-228/Kaisoku/refs/heads/devel/metadata/en-US/images/icon.png</string>
@@ -35,10 +35,6 @@
 		<item>1</item>
 	</string-array>
 	<string-array name="sync_url_list" translatable="false">
-		<item>https://sync.kotatsu.app</item>
-		<item>https://moe.shirizu.org</item>
-		<item>http://54.254.71.100</item>
-		<item>http://86.57.183.214:8081</item>
 	</string-array>
 	<string-array name="values_proxy_types" translatable="false">
 		<item>DIRECT</item>

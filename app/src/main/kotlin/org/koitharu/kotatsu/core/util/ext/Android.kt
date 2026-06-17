@@ -209,6 +209,7 @@ fun Context.ensureRamAtLeast(requiredSize: Long) {
 
 fun WebView.configureForParser(userAgentOverride: String?) = with(settings) {
 	javaScriptEnabled = true
+	setGeolocationEnabled(false)
 	domStorageEnabled = true
 	mediaPlaybackRequiresUserGesture = false
 	if (WebViewFeature.isFeatureSupported(WebViewFeature.MUTE_AUDIO)) {
@@ -216,9 +217,7 @@ fun WebView.configureForParser(userAgentOverride: String?) = with(settings) {
 	}
 	databaseEnabled = true
 	allowContentAccess = false
-	if (userAgentOverride != null) {
-		userAgentString = userAgentOverride
-	}
+	userAgentString = userAgentOverride ?: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 	val cookieManager = CookieManager.getInstance()
 	cookieManager.setAcceptCookie(true)
 	cookieManager.setAcceptThirdPartyCookies(this@configureForParser, true)
