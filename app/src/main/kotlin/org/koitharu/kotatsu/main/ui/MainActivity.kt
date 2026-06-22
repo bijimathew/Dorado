@@ -69,13 +69,11 @@ import org.koitharu.kotatsu.databinding.ActivityMainBinding
 import org.koitharu.kotatsu.details.service.MangaPrefetchService
 import org.koitharu.kotatsu.favourites.ui.container.FavouritesContainerFragment
 import org.koitharu.kotatsu.history.ui.HistoryListFragment
-import org.koitharu.kotatsu.local.ui.LocalStorageCleanupWorker
 import org.koitharu.kotatsu.main.ui.owners.AppBarOwner
 import org.koitharu.kotatsu.main.ui.owners.BottomNavOwner
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.remotelist.ui.MangaSearchMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionItemCallback
-import org.koitharu.kotatsu.settings.sources.manage.plugins.UpdatePluginsProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionListenerImpl
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionMenuProvider
 import org.koitharu.kotatsu.search.ui.suggestion.SearchSuggestionViewModel
@@ -94,9 +92,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 	@Inject
 	lateinit var settings: AppSettings
-
-	@Inject
-	lateinit var updatePluginsProvider: UpdatePluginsProvider
 
 	private val viewModel by viewModels<MainViewModel>()
 	private val searchSuggestionViewModel by viewModels<SearchSuggestionViewModel>()
@@ -176,9 +171,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 
 	override fun onResume() {
 		super.onResume()
-		lifecycleScope.launch(Dispatchers.Default) {
-			updatePluginsProvider.runAutoUpdate(settings)
-		}
 	}
 
 	override fun onFragmentChanged(fragment: Fragment, fromUser: Boolean) {
@@ -308,13 +300,9 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 	}
 
 	private fun onFirstStart() = try {
-		lifecycleScope.launch(Dispatchers.Main) { // not a default `Main.immediate` dispatcher
-			withContext(Dispatchers.Default) {
-				LocalStorageCleanupWorker.enqueue(applicationContext)
-			}
+		lifecycleScope.launch(Dispatchers.Main) {
 			withResumed {
 				MangaPrefetchService.prefetchLast(this@MainActivity)
-				requestNotificationsPermission()
 			}
 		}
 	} catch (e: IllegalStateException) {
@@ -361,20 +349,6 @@ class MainActivity : BaseActivity<ActivityMainBinding>(), AppBarOwner, BottomNav
 		adjustFabVisibility(isSearchOpened = isOpened)
 		bottomNav?.showOrHide(!isOpened)
 		updateContainerBottomMargin()
-	}
-
-	private fun requestNotificationsPermission() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(
-				this,
-				Manifest.permission.POST_NOTIFICATIONS,
-			) != PERMISSION_GRANTED
-		) {
-			ActivityCompat.requestPermissions(
-				this,
-				arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-				1,
-			)
-		}
 	}
 
 	private fun handleSearchSuggestionsInsets(insets: WindowInsetsCompat) {

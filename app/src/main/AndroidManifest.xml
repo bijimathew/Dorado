@@ -5,29 +5,8 @@
 
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-	<uses-permission
-		android:name="android.permission.FOREGROUND_SERVICE"
-		tools:ignore="ForegroundServicesPolicy" />
 	<uses-permission android:name="android.permission.WAKE_LOCK" />
 	<uses-permission android:name="android.permission.VIBRATE" />
-	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-	<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-	<uses-permission android:name="android.permission.GET_ACCOUNTS" />
-	<uses-permission android:name="android.permission.MANAGE_ACCOUNTS" />
-	<uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
-	<uses-permission android:name="android.permission.USE_CREDENTIALS" />
-	<uses-permission android:name="android.permission.READ_SYNC_STATS" />
-	<uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
-	<uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
-	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-	<uses-permission
-		android:name="android.permission.REQUEST_INSTALL_PACKAGES"
-		tools:ignore="RequestInstallPackagesPolicy" />
-	<uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-	<uses-permission
-		android:name="android.permission.QUERY_ALL_PACKAGES"
-		tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
 	<uses-permission
 		android:name="android.permission.WRITE_EXTERNAL_STORAGE"
 		android:maxSdkVersion="29" />
@@ -83,8 +62,6 @@
 			<intent-filter>
 				<action android:name="${applicationId}.action.VIEW_MANGA" />
 			</intent-filter>
-			
-			
 		</activity>
 		<activity
 			android:name="org.koitharu.kotatsu.reader.ui.ReaderActivity"
@@ -141,27 +118,6 @@
 				<data android:host="about" />
 				<data android:host="sync-settings" />
 			</intent-filter>
-		</activity>
-		<activity
-			android:name="org.koitharu.kotatsu.settings.sources.PluginActivity"
-			android:excludeFromRecents="true"
-			android:exported="true"
-			android:noHistory="true">
-			<intent-filter>
-				<action android:name="android.intent.action.VIEW" />
-				<category android:name="android.intent.category.DEFAULT" />
-				<data android:scheme="content" android:mimeType="application/java-archive" />
-				<data android:scheme="file" android:mimeType="application/java-archive" />
-				<data android:scheme="content" android:mimeType="application/x-java-archive" />
-				<data android:scheme="file" android:mimeType="application/x-java-archive" />
-				<data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
-				<data android:scheme="file" android:mimeType="application/vnd.android.package-archive" />
-				<data android:scheme="content" android:mimeType="application/octet-stream" android:pathPattern=".*\\.jar" />
-				<data android:scheme="file" android:mimeType="application/octet-stream" android:pathPattern=".*\\.jar" />
-				<data android:scheme="content" android:mimeType="application/octet-stream" android:pathPattern=".*\\.JAR" />
-				<data android:scheme="file" android:mimeType="application/octet-stream" android:pathPattern=".*\\.JAR" />
-			</intent-filter>
-			
 		</activity>
 		<activity
 			android:name="org.koitharu.kotatsu.settings.reader.ReaderTapGridConfigActivity"
@@ -279,9 +235,6 @@
 			android:name="org.koitharu.kotatsu.settings.sources.repo.MihonExtensionReposActivity"
 			android:exported="true"
 			android:label="@string/extension_repositories">
-			
-			
-			
 		</activity>
 		<activity
 			android:name="org.koitharu.kotatsu.settings.sources.repo.MihonRepoExtensionsActivity"
@@ -314,44 +267,11 @@
 			android:name="org.koitharu.kotatsu.picker.ui.PageImagePickActivity"
 			android:exported="true"
 			android:label="@string/pick_manga_page">
-			
-			
 		</activity>
 		<activity
 			android:name="org.koitharu.kotatsu.scrobbling.discord.ui.DiscordAuthActivity"
 			android:label="@string/discord" />
 
-		<service
-			android:name="androidx.work.impl.foreground.SystemForegroundService"
-			android:foregroundServiceType="dataSync"
-			tools:node="merge" />
-		<service
-			android:name="org.koitharu.kotatsu.local.ui.LocalChaptersRemoveService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/local_manga_processing" />
-		<service
-			android:name="org.koitharu.kotatsu.backups.ui.periodical.PeriodicalBackupService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/periodic_backups" />
-		<service
-			android:name="org.koitharu.kotatsu.alternatives.ui.AutoFixService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/fixing_manga" />
-		<service
-			android:name="org.koitharu.kotatsu.local.ui.LocalIndexUpdateService"
-			android:label="@string/local_manga_processing" />
-		<service
-			android:name="org.koitharu.kotatsu.backups.ui.backup.BackupService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/creating_backup" />
-		<service
-			android:name="org.koitharu.kotatsu.backups.ui.restore.RestoreService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/restoring_backup" />
-		<service
-			android:name="org.koitharu.kotatsu.local.ui.ImportService"
-			android:foregroundServiceType="dataSync"
-			android:label="@string/importing_manga" />
 		<service
 			android:name="org.koitharu.kotatsu.widget.shelf.ShelfWidgetService"
 			android:label="@string/manga_shelf"
@@ -360,13 +280,6 @@
 			android:name="org.koitharu.kotatsu.widget.recent.RecentWidgetService"
 			android:label="@string/recent_manga"
 			android:permission="android.permission.BIND_REMOTEVIEWS" />
-		<service
-			android:name="org.koitharu.kotatsu.details.service.MangaPrefetchService"
-			android:exported="false"
-			android:label="@string/prefetch_content" />
-		<service
-			android:name="org.koitharu.kotatsu.browser.AdListUpdateService"
-			android:exported="false" />
 
 		<provider
 			android:name="org.koitharu.kotatsu.search.ui.MangaSuggestionsProvider"
@@ -441,11 +354,6 @@
 			android:noHistory="true"
 			android:process=":crash"
 			android:theme="@style/Theme.Kotatsu" />
-		<service
-			android:name="org.koitharu.kotatsu.core.crash.CrashService"
-			android:exported="false"
-			android:foregroundServiceType="dataSync"
-			android:process=":crash" />
 		<receiver
 			android:name="org.koitharu.kotatsu.core.ErrorReporterReceiver"
 			android:exported="false">

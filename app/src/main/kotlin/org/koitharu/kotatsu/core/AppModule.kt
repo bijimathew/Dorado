@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import okhttp3.OkHttpClient
 import org.koitharu.kotatsu.BuildConfig
-import org.koitharu.kotatsu.backups.domain.BackupObserver
 import org.koitharu.kotatsu.core.db.MangaDatabase
 import org.koitharu.kotatsu.core.exceptions.resolve.CaptchaHandler
 import org.koitharu.kotatsu.core.image.AvifImageDecoder
@@ -40,7 +39,6 @@ import org.koitharu.kotatsu.core.image.CbzFetcher
 import org.koitharu.kotatsu.core.image.MangaSourceHeaderInterceptor
 import org.koitharu.kotatsu.core.network.MangaHttpClient
 import org.koitharu.kotatsu.core.network.imageproxy.ImageProxyInterceptor
-import org.koitharu.kotatsu.core.os.AppShortcutManager
 import org.koitharu.kotatsu.core.os.NetworkState
 import org.koitharu.kotatsu.core.parser.MangaLoaderContextImpl
 import org.koitharu.kotatsu.core.parser.favicon.FaviconFetcher
@@ -65,8 +63,6 @@ import org.koitharu.kotatsu.main.ui.protect.AppProtectHelper
 import org.koitharu.kotatsu.main.ui.protect.ScreenshotPolicyHelper
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.search.ui.MangaSuggestionsProvider
-import org.koitharu.kotatsu.sync.domain.SyncController
-import org.koitharu.kotatsu.widget.WidgetUpdater
 import javax.inject.Provider
 import javax.inject.Singleton
 
@@ -192,17 +188,7 @@ interface AppModule {
 
 		@Provides
 		@ElementsIntoSet
-		fun provideDatabaseObservers(
-			widgetUpdater: WidgetUpdater,
-			appShortcutManager: AppShortcutManager,
-			backupObserver: BackupObserver,
-			syncController: SyncController,
-		): Set<@JvmSuppressWildcards InvalidationTracker.Observer> = arraySetOf(
-			widgetUpdater,
-			appShortcutManager,
-			backupObserver,
-			syncController,
-		)
+		fun provideDatabaseObservers(): Set<@JvmSuppressWildcards InvalidationTracker.Observer> = emptySet()
 
 		@Provides
 		@ElementsIntoSet
